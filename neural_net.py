@@ -79,54 +79,12 @@ class Q_network():
             target = reward
             if not done:
                 target = reward + hp.gamma * \
-                       np.amax(self.model.predict(next_state)[0])
+                       np.max(self.model.predict(next_state)[0])
             target_f = self.model.predict(state)
             target_f[0][action] = target
             self.model.fit(state, target_f, epochs=1, verbose=0)
         if self.e > hp.e_min:
             self.e -= hp.e_decay
-
-    """def train(self):
-        stats.reset()
-        for epoch in range(hp.epochs):
-            steps = 0
-            s = self.env.reset(flattened=True)
-            stats.collect('games', (self.env.the_state, []))
-            d = False
-            if epoch % debug.log_epoch == 0:
-                print("game = {}".format(epoch))
-            while not d:
-                steps += 1
-                if debug.render:
-                    self.env.render()
-                first_Q = self.model.predict(s, batch_size=1)
-                a = np.argmax(first_Q)
-                if rand.uniform(0, 1) < self.e:
-                    a = rand.randint(0, self.env.action_size - 1)
-
-                if stats.collect_n_last_games:
-                    stats.games[-1][1].append(a)
-                s1, r, d, _ = self.env.step(a, flattened=True)
-                next_Q = self.model.predict(s1.reshape(1, self.env.flattened_input_size), batch_size=1)
-                max_Q = np.max(next_Q)
-                y = np.zeros((1, self.env.action_size))
-                y[:] = first_Q[:]
-                if r != hp.goal_reached_reward:
-                    update = r + hp.gamma * max_Q
-                else:
-                    update = r
-                y[0][a] = update
-                self.model.fit(s, y, batch_size=1, nb_epoch=1, verbose=0)
-                s = s1
-                if d:
-                    stats.collect('steps', steps)
-                    if debug.render:
-                        self.env.render()
-            if self.e > 0.05:
-                self.e -= (1 / hp.epochs)
-        if stats.collect_step_counts:
-            plt.plot(stats.steps)
-            plt.show()"""
 
 
 @atexit.register
@@ -152,7 +110,8 @@ if __name__ == "__main__":
                 stats.collect('steps', steps)
                 if epoch > 0 and epoch % debug.log_epoch == 0:
                     print("episode: {}/{}, score: {}".format(epoch, hp.epochs, steps),
-                          "avg. score last {} = {}".format(debug.log_epoch, np.mean(stats.steps[-debug.log_epoch:])))
+                          "avg. score last {} = {}".format(debug.log_epoch, np.mean(stats.steps[-debug.log_epoch:])),
+                          "epsilon = {}".format(agent.e))
                 break
         agent.replay(32)
     stats.plt('steps')

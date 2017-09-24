@@ -9,4 +9,4 @@ lr = 0.01
 gamma = 0.9
 e_start = 1
 e_min = 0.05
-e_decay = 1./epochs
+e_decay = 1./(epochs - epochs/20.)
