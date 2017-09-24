@@ -2,7 +2,7 @@ import numpy as np
 import ricochet.hyperparameter as hp
 
 grid_size = 4
-figures = ['red', 'green']
+figures = ['red', 'green', 'grey']
 num_figures = len(figures)
 goals = ['placeholder']
 red_goals = ['red_star', 'red_line']
@@ -13,7 +13,7 @@ num_goals = len(goals)
 
 goal_dict = {1: ('red_star', 'R*'), 2: ('red_line', 'R-'), 3: ('green_star', 'G*'), 4: ('green_line', 'G-')}
 dir_dict = {0: 'right', 1: 'down', 2: 'left', 3: 'up'}
-fig_dict = {0: ('red', red_goals, 'R') , 1: ('green', green_goals, 'G')}
+fig_dict = {0: ('red', red_goals, 'R'), 1: ('green', green_goals, 'G'), 2: ('grey', [], 'g')}
 
 
 class action():
@@ -48,6 +48,7 @@ class environment():
         self.add_surrounding()
         self.figs_on_board.clear()
         self.add_single_figure([3, 3], 'red')
+        self.add_single_figure([3, 0], 'grey')
         self.add_single_figure([2, 3], 'green')
         self.add_single_goal([0, 0], 'red_star')
         self.add_single_goal([3, 0], 'red_line')
