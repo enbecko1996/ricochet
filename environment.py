@@ -2,7 +2,7 @@ import numpy as np
 import ricochet.hyperparameter as hp
 
 grid_size = 4
-figures = ['red', 'green']
+figures = ['red']  # , 'green']
 num_figures = len(figures)
 goals = ['placeholder']
 red_goals = ['red_star', 'red_line']
@@ -48,10 +48,10 @@ class environment():
         self.add_surrounding()
         self.figs_on_board.clear()
         self.add_single_figure([3, 3], 'red')
-        self.add_single_figure([2, 3], 'green')
+        # self.add_single_figure([2, 3], 'green')
         self.add_single_goal([0, 0], 'red_star')
         self.add_single_goal([3, 0], 'red_line')
-        self.set_current_goal('red_line')
+        self.set_current_goal('red_star')
         if flattened:
             return self.get_flattened_reduced_state()
         else:
