@@ -70,17 +70,23 @@ class Q_network():
     def remember(self, state, action, reward, next_state, done):
         self.memory.append((state, action, reward, next_state, done))
 
-    def act(self, state):
-        cur_actions = self.env.get_valid_actions()
-        cur_size = len(cur_actions)
-        if np.random.rand() <= self.e:
-            return cur_actions[rand.randrange(cur_size)]
-        act_values = np.take(self.model.predict(state)[0], cur_actions)
+    def act(self, state, only_valid=True):
+        if only_valid:
+            cur_actions = self.env.get_valid_actions()
+            cur_size = len(cur_actions)
+            if np.random.rand() <= self.e:
+                return cur_actions[rand.randrange(cur_size)]
+            act_values = np.take(self.model.predict(state)[0], cur_actions)
+        else:
+            act_values = self.model.predict(state)[0]
         return np.argmax(act_values)
 
-    def replay(self, batch_size):
+    def replay(self, batch_size, qmax_func, last=False):
         if len(self.memory) > batch_size:
-            mini_batch = rand.sample(self.memory, batch_size)
+            if not last:
+                mini_batch = rand.sample(self.memory, batch_size)
+            else:
+                mini_batch = self.memory[-batch_size:]
         else:
             mini_batch = self.memory
         x_train = []
@@ -89,7 +95,7 @@ class Q_network():
             target = reward
             if not done:
                 # print(stats, action, reward, next_state, done)
-                Q_max = np.max(self.model.predict(next_state)[0])
+                Q_max = qmax_func(self.model.predict(next_state), self.env, next_state)
                 target = reward + hp.gamma * Q_max
 
             y = self.model.predict(state)[0]
@@ -99,6 +105,14 @@ class Q_network():
         self.model.fit(np.array(x_train), np.array(y_train), batch_size=batch_size, epochs=1, verbose=0)
         if self.e > hp.e_min:
             self.e -= hp.e_decay
+
+
+def valid_qmax(prediction, env, state):
+    return np.max(np.take(prediction, env.get_valid_actions(state, flattened=True)))
+
+
+def all_qmax(prediction, env=None, state=None):
+    return np.max(prediction)
 
 
 @atexit.register
@@ -128,7 +142,7 @@ def train_agent(agent):
                           "epsilon = {}".format(agent.e))
                     cum_r = 0.
                 break
-        agent.replay(64)
+        agent.replay(64, valid_qmax)
     stats.plt('steps')
     agent.model.save('my_model.h5')
 
