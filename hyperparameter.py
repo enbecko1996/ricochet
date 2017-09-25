@@ -4,7 +4,7 @@ step_reward = -1.
 in_wall_reward = -10.
 
 # neural_net
-epochs = 4000
+epochs = 40000
 lr = 0.03
 gamma = 0.9
 e_start = 1

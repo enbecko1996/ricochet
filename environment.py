@@ -79,7 +79,7 @@ class environment():
                     test = as_one_hot(figures.index(test), num_figures)
                     for x in range(self.grid_size):
                         for y in range(self.grid_size):
-                            if self.the_state[x][y][4:4 + num_figures] == test:
+                            if np.array_equal(self.the_state[x][y][4:4 + num_figures], test):
                                 return x, y
                 if test in goals:
                     test = goals.index(test)
@@ -87,20 +87,6 @@ class environment():
                         for y in range(self.grid_size):
                             if self.the_state[x][y][4 + num_figures] == test:
                                 return x, y
-
-    def get_valid_actions(self):
-        valid = []
-        for act in actions:
-            fig_pos = self.get_pos_on_board(act.figure)
-            if self.is_valid_action(fig_pos, act.direction):
-                valid.append(actions.index(act))
-        return valid
-
-    def is_valid_action(self, pos, direc):
-        new_x, new_y = self.iterate_step(pos[0], pos[1], direc, steps=1)
-        if new_x != pos[0] and new_y != pos[1]:
-            return True
-        return False
 
     def get_goal_color(self, gol):
         if isinstance(gol, str):
@@ -145,19 +131,19 @@ class environment():
             if direc == 0:
                 if self.valid_x_y(x + 1, y) and max(self.the_state[x + 1][y][4:4 + self.num_figures]) == 0:
                     if steps is None or steps >= 0:
-                        return self.iterate_step(x + 1, y, direc)
+                        return self.iterate_step(x + 1, y, direc, steps=steps)
             if direc == 1:
                 if self.valid_x_y(x, y + 1) and max(self.the_state[x][y + 1][4:4 + self.num_figures]) == 0:
                     if steps is None or steps >= 0:
-                        return self.iterate_step(x, y + 1, direc)
+                        return self.iterate_step(x, y + 1, direc, steps=steps)
             if direc == 2:
                 if self.valid_x_y(x - 1, y) and max(self.the_state[x - 1][y][4:4 + self.num_figures]) == 0:
                     if steps is None or steps >= 0:
-                        return self.iterate_step(x - 1, y, direc)
+                        return self.iterate_step(x - 1, y, direc, steps=steps)
             if direc == 3:
                 if self.valid_x_y(x, y - 1) and max(self.the_state[x][y - 1][4:4 + self.num_figures]) == 0:
                     if steps is None or steps >= 0:
-                        return self.iterate_step(x, y - 1, direc)
+                        return self.iterate_step(x, y - 1, direc, steps=steps)
         return x, y
 
     def add_single_figure(self, pos, fig):
@@ -240,6 +226,22 @@ class environment():
         return -1 < x < self.grid_size and -1 < y < self.grid_size
 
 
+def get_valid_actions():
+    valid = []
+    for act in actions:
+        fig_pos = self.get_pos_on_board(fig_dict[act.figure][0])
+        if self.is_valid_action(fig_pos, act.direction):
+            valid.append(actions.index(act))
+        return valid
+
+
+def is_valid_action(pos, direc):
+    new_x, new_y = self.iterate_step(pos[0], pos[1], direc, steps=1)
+    if new_x != pos[0] or new_y != pos[1]:
+        return True
+    return False
+
+
 def get_id_from_name(name, search_list):
     for idx in range(len(search_list)):
         if search_list[idx] == name:
@@ -260,7 +262,7 @@ def get_wall_one_hot(d, invert=False):
 
 
 def as_one_hot(make_one_hot, num):
-    out = np.zeros(num)
+    out = np.zeros(num, dtype=np.int)
     out[make_one_hot] = 1
     return out
 

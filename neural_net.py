@@ -59,23 +59,24 @@ class Q_network():
         self.model.add(Dense(300, activation='relu', kernel_initializer='lecun_uniform', input_shape=(self.env.flattened_input_size,)))
         # model.add(Dropout(0.2)) I'm not using dropout, but maybe you wanna give it a try?
 
-        # self.model.add(Dense(150, activation='relu'))
+        self.model.add(Dense(150, activation='relu', kernel_initializer='lecun_uniform'))
         # model.add(Dropout(0.2))
 
         self.model.add(Dense(self.env.action_size, activation='linear'))
         print('action_size =', self.env.action_size)
 
-        rms = RMSprop()
-        self.model.compile(loss='mse', optimizer=rms)
+        self.model.compile(loss='mse', optimizer=Adam(lr=hp.lr))
 
     def remember(self, state, action, reward, next_state, done):
         self.memory.append((state, action, reward, next_state, done))
 
     def act(self, state):
+        cur_actions = self.env.get_valid_actions()
+        cur_size = len(cur_actions)
         if np.random.rand() <= self.e:
-            return rand.randrange(self.env.action_size)
-        act_values = self.model.predict(state)
-        return np.argmax(act_values[0])
+            return cur_actions[rand.randrange(cur_size)]
+        act_values = np.take(self.model.predict(state)[0], cur_actions)
+        return np.argmax(act_values)
 
     def replay(self, batch_size):
         if len(self.memory) > batch_size:
@@ -88,8 +89,9 @@ class Q_network():
             target = reward
             if not done:
                 # print(stats, action, reward, next_state, done)
-                target = reward + hp.gamma * \
-                                  np.max(self.model.predict(next_state)[0])
+                Q_max = np.max(self.model.predict(next_state)[0])
+                target = reward + hp.gamma * Q_max
+
             y = self.model.predict(state)[0]
             y[action] = target
             x_train.append(state.reshape(self.env.flattened_input_size,))
@@ -128,6 +130,7 @@ def train_agent(agent):
                 break
         agent.replay(64)
     stats.plt('steps')
+    agent.model.save('my_model.h5')
 
 
 def test_agent(agent):
