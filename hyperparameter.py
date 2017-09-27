@@ -1,12 +1,20 @@
 # environment
-goal_reached_reward = 100.
+goal_reached_reward = 10.
 step_reward = -1.
-in_wall_reward = -10.
+in_wall_reward = -1.
 
 # neural_net
-epochs = 40000
-lr = 0.03
-gamma = 0.9
-e_start = 0.5
-e_min = 0.1
-e_decay = 1./(epochs - epochs/6.)
+EPOCHS = 20000
+HUBER_LOSS_DELTA = 1.0
+LEARNING_RATE = 0.00025
+
+MEMORY_CAPACITY = 100000
+BATCH_SIZE = 32
+
+GAMMA = 0.99
+
+MAX_EPSILON = 1
+MIN_EPSILON = 0.01
+LAMBDA = 0.00002  # speed of decay
+
+UPDATE_TARGET_FREQUENCY = 1000

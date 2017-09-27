@@ -1,10 +1,11 @@
 import numpy as np
 import ricochet.hyperparameter as hp
+import random as rand
 
 grid_size = 4
 figures = ['red', 'green', 'grey']
 # num_figures = len(figures)
-num_figures = 1
+num_figures = 3
 goals = ['placeholder']
 red_goals = ['red_star', 'red_line']
 green_goals = ['green_star', 'green_line']
@@ -44,13 +45,13 @@ class environment():
         self.figs_on_board = []
         pass
 
-    def reset(self, flattened=True):
+    def reset(self, flattened=True, figure_style='same'):
         self.the_state = np.zeros((self.grid_size, self.grid_size, 4 + num_figures + 1), dtype=np.int)
         self.reduced_state = np.zeros((self.grid_size, self.grid_size, 4 + num_figures + num_figures), dtype=np.int)
         self.add_surrounding()
+        self.add_walls([([3, 2], [3, 3]), ([0, 3], [1, 3])])
         self.figs_on_board.clear()
-        self.add_single_figure([3, 3], 'red')
-        # self.add_single_figure([2, 3], 'green')
+        self.set_figures(figure_style)
         self.add_single_goal([0, 0], 'red_star')
         self.add_single_goal([3, 0], 'red_line')
         self.set_current_goal('red_star')
@@ -58,6 +59,20 @@ class environment():
             return self.get_flattened_reduced_state()
         else:
             return self.reduced_state
+
+    def set_figures(self, style):
+        if style == 'same':
+            self.add_single_figure([3, 3], 'red')
+            self.add_single_figure([2, 3], 'green')
+            self.add_single_figure([1, 3], 'grey')
+        if style == 'random':
+            poss = []
+            for i in range(num_figures):
+                x, y = rand.randrange(0, self.grid_size), rand.randrange(0, self.grid_size)
+                if (x, y) not in poss:
+                    poss.append((x, y))
+                    self.add_single_figure([x, y], i)
+
 
     def set_current_goal(self, gol):
         if isinstance(gol, str):
@@ -70,7 +85,7 @@ class environment():
             # print(self.the_state, self.reduced_state)
 
     def get_flattened_reduced_state(self):
-        return self.reduced_state.reshape(1, self.flattened_input_size)
+        return np.array(np.reshape(self.reduced_state, (self.flattened_input_size,)))
 
     def get_pos_on_board(self, state, test):
         if test is not None:
@@ -112,7 +127,7 @@ class environment():
         if flattened:
             return self.get_flattened_reduced_state(), apply[0], apply[1], None
         else:
-            return self.reduced_state, apply[0], apply[1], None
+            return np.array(self.reduced_state), apply[0], apply[1], None
 
             # fig as id and not one-hot, direc as well
 
@@ -210,14 +225,19 @@ class environment():
         for new in between:
             self.add_single_wall(new)
 
-    def render(self):
+    def render(self, state=None, flattened=False, reduced=False):
+        if state is None:
+            state = self.the_state
+        else:
+            if flattened:
+                state = np.reshape(state, (self.grid_size, self.grid_size, 4 + num_figures + num_figures))
         board = np.chararray((self.grid_size, self.grid_size), itemsize=7, unicode=True)
         for x in range(self.grid_size):
             for y in range(self.grid_size):
-                board[x][y] = self.get_symbolic_for_pos(self.the_state[x][y])
+                board[x][y] = self.get_symbolic_for_pos(state[x][y], reduced=reduced)
         print(np.transpose(board))
 
-    def get_symbolic_for_pos(self, pos):
+    def get_symbolic_for_pos(self, pos, reduced=False):
         out = list('~~~~~~~')
         if pos[0] == 1:
             out[6] = '|'
@@ -228,15 +248,27 @@ class environment():
         if pos[3] == 1:
             out[1] = '^'
         figure = one_hot_to_id(pos[4:4 + num_figures])
-        goal = pos[4 + num_figures]
+        if not reduced:
+            goal = pos[4 + num_figures]
+            if goal > 0:
+                out[3:4] = goal_dict[goal][1]
+        else:
+            goal = pos[4 + num_figures:4 + 2 * num_figures]
+            goal = one_hot_to_id(goal)
+            if goal > -1:
+                out[3] = fig_dict[goal][2]
+                out[4] = '*'
         if figure != -1:
             out[2] = fig_dict[figure][2]
-        if goal > 0:
-            out[3:4] = goal_dict[goal][1]
         return ''.join(out)
 
     def valid_x_y(self, x, y):
         return -1 < x < self.grid_size and -1 < y < self.grid_size
+
+
+def print_action(act):
+    act = actions[act]
+    return "{} {}".format(fig_dict[act.figure][0], dir_dict[act.direction])
 
 
 def get_goal_color(gol):
