@@ -47,13 +47,13 @@ fig_dict = {0: ('red', red_goals, 'R', red), 1: ('green', green_goals, 'G', gree
             4: ('grey', grey_goals, 'g', grey)}
 
 
-class action():
+class Action:
     def __init__(self, fig, direc):
         self.figure = fig
         self.direction = direc
 
 
-actions = [action(f, d) for f in range(num_figures) for d in range(4)]
+actions = [Action(f, d) for f in range(num_figures) for d in range(4)]
 action_size = len(actions)
 
 
@@ -73,14 +73,27 @@ class Environment:
         self.cur_goal_color = None
         self.figs_on_board = []
         self.goals_on_board = []
+        self.all_quadrants = np.load("quadrants/pre_all.npy")
         pass
 
-    def reset(self, flattened=True, figure_style='same'):
+    def reset(self, flattened=True, figure_style='same', board_style='random'):
         self.the_state = np.zeros((self.grid_size, self.grid_size, 4 + num_figures + 1), dtype=np.int)
         self.reduced_state = np.zeros((self.grid_size, self.grid_size, 4 + num_figures + num_figures), dtype=np.int)
         self.figs_on_board.clear()
         self.goals_on_board.clear()
         self.set_figures(figure_style)
+        if isinstance(board_style, str) and board_style == 'random':
+            taken = list(range(len(self.all_quadrants)))
+            for i in range(4):
+                idx = rand.randrange(0, len(taken))
+                next_quad = taken[idx]
+                del taken[idx]
+                style = rand.randrange(0, 2) if next_quad < 4 else 1
+                self.set_quadrant(i + 1, self.all_quadrants[next_quad][style])
+        elif board_style is not None:
+            for i in range(4):
+                self.set_quadrant(i + 1, self.all_quadrants[board_style[i][0]][board_style[i][1]])
+        self.cleanup()
         if flattened:
             return self.get_flattened_reduced_state()
         else:
@@ -89,80 +102,26 @@ class Environment:
     def save_current_game(self, filename):
         np.save(filename, self.the_state)
 
+    def save_current_as_quadrant(self, filename):
+        lis = [self.the_state, hlp.get_rotated_quadrant(2, self.the_state, self.grid_size / 2),
+               hlp.get_rotated_quadrant(3, self.the_state, self.grid_size / 2),
+               hlp.get_rotated_quadrant(4, self.the_state, self.grid_size / 2)]
+        np.save(filename, np.array(lis))
+
     def load_game(self, filename):
-        self.the_state = load_state(filename)
+        self.the_state = hlp.load_state(filename)
 
-    def get_rotated_quadrant(self, quad, state):
-        if 1 <= quad <= 4:
-            if isinstance(state, str):
-                state = load_state(state)
-            out = np.zeros_like(state)
-            half_g = int(self.grid_size / 2)
+    def cleanup(self):
+        half_g = int(self.grid_size / 2)
+        for quad in range(1, 5):
             if quad == 1:
-                out = np.array(state)
-            elif quad == 2:
-                for x in range(0, half_g):
-                    for y in range(0, half_g):
-                        out[x][y] = state[y][half_g - x - 1]
-                        new_walls = np.zeros(4)
-                        for i in range(4):
-                            if out[x][y][i] == 1:
-                                if i + 1 < 4:
-                                    new_walls[i + 1] = 1
-                                else:
-                                    new_walls[i - 3] = 1
-                        out[x][y][:4] = new_walls
-            elif quad == 3:
-                for x in range(0, half_g):
-                    for y in range(half_g, self.grid_size):
-                        out[x][y] = state[half_g - x - 1][self.grid_size - y -1]
-                        new_walls = np.zeros(4)
-                        for i in range(4):
-                            if out[x][y][i] == 1:
-                                if i + 2 < 4:
-                                    new_walls[i + 2] = 1
-                                else:
-                                    new_walls[i - 2] = 1
-                        out[x][y][:4] = new_walls
-            elif quad == 4:
-                for x in range(0, half_g):
-                    for y in range(0, half_g):
-                        out[x][y] = state[half_g - y - 1][x]
-                        new_walls = np.zeros(4)
-                        for i in range(4):
-                            if out[x][y][i] == 1:
-                                if i + 3 < 4:
-                                    new_walls[i + 3] = 1
-                                else:
-                                    new_walls[i - 1] = 1
-                        out[x][y][:4] = new_walls
-            return out
-
-    def set_quadrant(self, quad, file_name):
-        if 1 <= quad <= 4:
-            quad_state = load_state(file_name)
-            half_g = int(self.grid_size / 2)
-            if quad == 1:
-                for x in range(half_g, self.grid_size):
-                    self.the_state[x][:half_g] = quad_state[x - half_g][:]
                 for y in range(0, half_g):
                     if self.the_state[half_g][y][2] == 1:
                         self.the_state[half_g - 1][y][0] = 1
                 for x in range(half_g, self.grid_size):
                     if self.the_state[x][half_g - 1][1] == 1:
-                        self.the_state[x - 1][half_g - 1][3] = 1
+                        self.the_state[x][half_g][3] = 1
             elif quad == 2:
-                for x in range(half_g, self.grid_size):
-                    for y in range(half_g, self.grid_size):
-                        self.the_state[x][y] = quad_state[y - half_g][self.grid_size - x - 1]
-                        new_walls = np.zeros(4)
-                        for i in range(4):
-                            if self.the_state[x][y][i] == 1:
-                                if i + 1 < 4:
-                                    new_walls[i + 1] = 1
-                                else:
-                                    new_walls[i - 3] = 1
-                        self.the_state[x][y][:4] = new_walls
                 for y in range(half_g, self.grid_size):
                     if self.the_state[half_g][y][2] == 1:
                         self.the_state[half_g - 1][y][0] = 1
@@ -170,17 +129,6 @@ class Environment:
                     if self.the_state[x][half_g][3] == 1:
                         self.the_state[x][half_g - 1][1] = 1
             elif quad == 3:
-                for x in range(0, half_g):
-                    for y in range(half_g, self.grid_size):
-                        self.the_state[x][y] = quad_state[half_g - x - 1][self.grid_size - y -1]
-                        new_walls = np.zeros(4)
-                        for i in range(4):
-                            if self.the_state[x][y][i] == 1:
-                                if i + 2 < 4:
-                                    new_walls[i + 2] = 1
-                                else:
-                                    new_walls[i - 2] = 1
-                        self.the_state[x][y][:4] = new_walls
                 for y in range(half_g, self.grid_size):
                     if self.the_state[half_g - 1][y][0] == 1:
                         self.the_state[half_g][y][2] = 1
@@ -188,23 +136,30 @@ class Environment:
                     if self.the_state[x][half_g][3] == 1:
                         self.the_state[x][half_g - 1][1] = 1
             elif quad == 4:
-                for x in range(0, half_g):
-                    for y in range(0, half_g):
-                        self.the_state[x][y] = quad_state[half_g - y - 1][x]
-                        new_walls = np.zeros(4)
-                        for i in range(4):
-                            if self.the_state[x][y][i] == 1:
-                                if i + 3 < 4:
-                                    new_walls[i + 3] = 1
-                                else:
-                                    new_walls[i - 1] = 1
-                        self.the_state[x][y][:4] = new_walls
                 for y in range(0, half_g):
                     if self.the_state[half_g - 1][y][0] == 1:
                         self.the_state[half_g][y][2] = 1
                 for x in range(0, half_g):
                     if self.the_state[x][half_g - 1][1] == 1:
                         self.the_state[x][half_g][3] = 1
+
+    def set_quadrant(self, quad, quad_state):
+        if 1 <= quad <= 4:
+            if isinstance(quad_state, str):
+                quad_state = hlp.load_state(quad_state)
+            half_g = int(self.grid_size / 2)
+            if quad == 1:
+                for x in range(half_g, self.grid_size):
+                    self.the_state[x][:half_g] = quad_state[0][x - half_g][:]
+            elif quad == 2:
+                for x in range(half_g, self.grid_size):
+                    self.the_state[x][half_g:self.grid_size] = quad_state[1][x - half_g][:]
+            elif quad == 3:
+                for x in range(0, half_g):
+                    self.the_state[x][half_g:self.grid_size] = quad_state[2][x - half_g][:]
+            elif quad == 4:
+                for x in range(0, half_g):
+                    self.the_state[x][:half_g] = quad_state[3][x - half_g][:]
 
     def set_figures(self, style):
         if style == 'none':
@@ -435,10 +390,6 @@ class Environment:
 
     def valid_x_y(self, x, y):
         return -1 < x < self.grid_size and -1 < y < self.grid_size
-
-
-def load_state(filename):
-    return np.load(filename)
 
 
 def print_action(act):

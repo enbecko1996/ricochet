@@ -228,20 +228,23 @@ class RandomAgent:
 
 
 # -------------------- ENVIRONMENT ---------------------
-import ricochet.game as envi
+import ricochet.game as the_game
+
+
+board_style = [[2, 0], [3, 1], [6, 0], [0, 1]]
 
 
 class Environment:
     def __init__(self, problem=None):
         self.samples = []
-        if problem is None:
-            self.my_env = envi.Environment(4)
+        if isinstance(problem, the_game.Environment):
+            self.my_env = problem
         else:
             self.problem = problem
             self.my_env = gym.make(problem)
 
     def run(self, current_agent):
-        s = self.my_env.reset(figure_style='random')
+        s = self.my_env.reset(figure_style='random', board_style=board_style)
         total_reward = 0
 
         steps = 0
@@ -267,7 +270,7 @@ class Environment:
         return steps, total_reward
 
     def play_game(self, current_agent):
-        s = self.my_env.reset(figure_style='random')
+        s = self.my_env.reset(figure_style='random', board_style=board_style)
         total_reward = 0
         steps = 0
         while steps < 500:
@@ -281,8 +284,8 @@ class Environment:
             else:
                 a = numpy.argmax(prediction)
             print("max = {}, {}, taken = {}, {}".format(numpy.argmax(prediction),
-                                                        envi.print_action(numpy.argmax(prediction)), a,
-                                                        envi.print_action(a)))
+                                                        the_game.print_action(numpy.argmax(prediction)), a,
+                                                        the_game.print_action(a)))
             s_, r, done, info = self.my_env.step(a)
             if done:  # terminal state
                 s_ = None
@@ -295,7 +298,11 @@ class Environment:
 
 # -------------------- MAIN ----------------------------
 PROBLEM = 'CartPole-v0'
-the_environment = Environment()
+import os
+print(os.getcwd())
+np.load("quadrants/pre_7.npy")
+the_environment = Environment(the_game.Environment(16))
+
 
 """stateCnt = env.env.observation_space.shape[0]
 actionCnt = env.env.action_space.n"""

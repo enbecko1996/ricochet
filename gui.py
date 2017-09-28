@@ -49,7 +49,6 @@ class Picker(QWidget):
             if cur_len > longest:
                 longest = cur_len
             j += 1
-        print(game.num_figures)
         self.resize(self.btn_size + longest * self.btn_size, game.num_figures * self.btn_size)
         self.show()
 
@@ -116,14 +115,14 @@ class Board(QWidget):
         self.pick.hide()
 
     def clear(self):
-        self.env.reset(figure_style='none')
-        self.env.set_quadrant(1, 'quadrants/pre_0.npy')
-        self.env.set_quadrant(2, 'quadrants/pre_2.npy')
-        self.env.set_quadrant(3, 'quadrants/pre_4.npy')
-        self.env.set_quadrant(4, 'quadrants/pre_6.npy')
+        self.env.reset(figure_style='none', board_style=[[2, 0], [3, 1], [6, 0], [0, 1]])
+        """self.env.set_quadrant(1, "quadrants/pre_0_1.npy")
+        self.env.set_quadrant(2, "quadrants/pre_7_1.npy")
+        self.env.set_quadrant(3, "quadrants/pre_3_0.npy")
+        self.env.set_quadrant(4, "quadrants/pre_2_1.npy")"""
 
     def save(self, file_name):
-        self.env.save_current_game(file_name)
+        self.env.save_current_as_quadrant(file_name)
 
     def sizeHint(self):
         par_size = self.parentWidget().size()
