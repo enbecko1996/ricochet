@@ -235,7 +235,7 @@ class Environment:
     def __init__(self, problem=None):
         self.samples = []
         if problem is None:
-            self.my_env = envi.environment(4)
+            self.my_env = envi.Environment(4)
         else:
             self.problem = problem
             self.my_env = gym.make(problem)

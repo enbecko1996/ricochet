@@ -1,21 +1,50 @@
 import numpy as np
 import ricochet.hyperparameter as hp
 import random as rand
+import ricochet.game_items_drawer as g
+import ricochet.helper as hlp
 
 grid_size = 4
-figures = ['red', 'green', 'grey']
-# num_figures = len(figures)
-num_figures = 3
+figures = ['red', 'green', 'blue', 'yellow', 'grey']
+num_figures = len(figures)
 goals = ['placeholder']
-red_goals = ['red_star', 'red_line']
-green_goals = ['green_star', 'green_line']
+red_goals = ['red_hexagon', 'red_square', 'red_triangle', 'red_circle']
+green_goals = ['green_hexagon', 'green_square', 'green_triangle', 'green_circle']
+blue_goals = ['blue_hexagon', 'blue_square', 'blue_triangle', 'blue_circle']
+yellow_goals = ['yellow_hexagon', 'yellow_square', 'yellow_triangle', 'yellow_circle']
+grey_goals = ['all']
 goals.extend(red_goals)
 goals.extend(green_goals)
+goals.extend(blue_goals)
+goals.extend(yellow_goals)
+goals.extend(grey_goals)
 num_goals = len(goals)
 
-goal_dict = {1: ('red_star', 'R*'), 2: ('red_line', 'R-'), 3: ('green_star', 'G*'), 4: ('green_line', 'G-')}
+red = (255, 60, 60)
+green = (60, 255, 60)
+blue = (60, 60, 255)
+yellow = (255, 255, 60)
+grey = (160, 160, 160)
+
+red_g = (255, 140, 140)
+green_g = (140, 255, 140)
+blue_g = (140, 140, 255)
+yellow_g = (255, 255, 140)
+grey_g = (0, 0, 0)
+
+goal_dict = {1: ('red_hexagon', 'R*', red_g, g.hexagon), 2: ('red_square', 'R#', red_g, g.square), 
+             3: ('red_triangle', 'R^', red_g, g.triangle), 4: ('red_circle', 'R°', red_g, g.circle),
+             5: ('green_hexagon', 'G*', green_g, g.hexagon), 6: ('green_square', 'G#', green_g, g.square),
+             7: ('green_triangle', 'G^', green_g, g.triangle), 8: ('green_circle', 'G°', green_g, g.circle),
+             9: ('blue_hexagon', 'B*', blue_g, g.hexagon), 10: ('blue_square', 'B#', blue_g, g.square),
+             11: ('blue_triangle', 'B^', blue_g, g.triangle), 12: ('blue_circle', 'B°', blue_g, g.circle),
+             13: ('yellow_hexagon', 'Y*', yellow_g, g.hexagon), 14: ('yellow_square', 'Y#', yellow_g, g.square),
+             15: ('yellow_triangle', 'Y^', yellow_g, g.triangle), 16: ('yellow_circle', 'Y°', yellow_g, g.circle),
+             17: ('all', 'AA', grey_g, g.square)}
 dir_dict = {0: 'right', 1: 'down', 2: 'left', 3: 'up'}
-fig_dict = {0: ('red', red_goals, 'R'), 1: ('green', green_goals, 'G'), 2: ('grey', [], 'g')}
+fig_dict = {0: ('red', red_goals, 'R', red), 1: ('green', green_goals, 'G', green),
+            2: ('blue', blue_goals, 'B', blue), 3: ('yellow', yellow_goals, 'Y', yellow),
+            4: ('grey', grey_goals, 'g', grey)}
 
 
 class action():
@@ -28,7 +57,7 @@ actions = [action(f, d) for f in range(num_figures) for d in range(4)]
 action_size = len(actions)
 
 
-class environment():
+class Environment:
     def __init__(self, g_size):
         self.the_state = np.zeros((g_size, g_size, 4 + num_figures + 1), dtype=np.int)
         self.reduced_state = np.zeros((g_size, g_size, 4 + num_figures + num_figures), dtype=np.int)
@@ -43,24 +72,143 @@ class environment():
         self.cur_goal_pos = None
         self.cur_goal_color = None
         self.figs_on_board = []
+        self.goals_on_board = []
         pass
 
     def reset(self, flattened=True, figure_style='same'):
         self.the_state = np.zeros((self.grid_size, self.grid_size, 4 + num_figures + 1), dtype=np.int)
         self.reduced_state = np.zeros((self.grid_size, self.grid_size, 4 + num_figures + num_figures), dtype=np.int)
-        self.add_surrounding()
-        self.add_walls([([3, 2], [3, 3]), ([0, 3], [1, 3])])
         self.figs_on_board.clear()
+        self.goals_on_board.clear()
         self.set_figures(figure_style)
-        self.add_single_goal([0, 0], 'red_star')
-        self.add_single_goal([3, 0], 'red_line')
-        self.set_current_goal('red_star')
         if flattened:
             return self.get_flattened_reduced_state()
         else:
             return self.reduced_state
 
+    def save_current_game(self, filename):
+        np.save(filename, self.the_state)
+
+    def load_game(self, filename):
+        self.the_state = load_state(filename)
+
+    def get_rotated_quadrant(self, quad, state):
+        if 1 <= quad <= 4:
+            if isinstance(state, str):
+                state = load_state(state)
+            out = np.zeros_like(state)
+            half_g = int(self.grid_size / 2)
+            if quad == 1:
+                out = np.array(state)
+            elif quad == 2:
+                for x in range(0, half_g):
+                    for y in range(0, half_g):
+                        out[x][y] = state[y][half_g - x - 1]
+                        new_walls = np.zeros(4)
+                        for i in range(4):
+                            if out[x][y][i] == 1:
+                                if i + 1 < 4:
+                                    new_walls[i + 1] = 1
+                                else:
+                                    new_walls[i - 3] = 1
+                        out[x][y][:4] = new_walls
+            elif quad == 3:
+                for x in range(0, half_g):
+                    for y in range(half_g, self.grid_size):
+                        out[x][y] = state[half_g - x - 1][self.grid_size - y -1]
+                        new_walls = np.zeros(4)
+                        for i in range(4):
+                            if out[x][y][i] == 1:
+                                if i + 2 < 4:
+                                    new_walls[i + 2] = 1
+                                else:
+                                    new_walls[i - 2] = 1
+                        out[x][y][:4] = new_walls
+            elif quad == 4:
+                for x in range(0, half_g):
+                    for y in range(0, half_g):
+                        out[x][y] = state[half_g - y - 1][x]
+                        new_walls = np.zeros(4)
+                        for i in range(4):
+                            if out[x][y][i] == 1:
+                                if i + 3 < 4:
+                                    new_walls[i + 3] = 1
+                                else:
+                                    new_walls[i - 1] = 1
+                        out[x][y][:4] = new_walls
+            return out
+
+    def set_quadrant(self, quad, file_name):
+        if 1 <= quad <= 4:
+            quad_state = load_state(file_name)
+            half_g = int(self.grid_size / 2)
+            if quad == 1:
+                for x in range(half_g, self.grid_size):
+                    self.the_state[x][:half_g] = quad_state[x - half_g][:]
+                for y in range(0, half_g):
+                    if self.the_state[half_g][y][2] == 1:
+                        self.the_state[half_g - 1][y][0] = 1
+                for x in range(half_g, self.grid_size):
+                    if self.the_state[x][half_g - 1][1] == 1:
+                        self.the_state[x - 1][half_g - 1][3] = 1
+            elif quad == 2:
+                for x in range(half_g, self.grid_size):
+                    for y in range(half_g, self.grid_size):
+                        self.the_state[x][y] = quad_state[y - half_g][self.grid_size - x - 1]
+                        new_walls = np.zeros(4)
+                        for i in range(4):
+                            if self.the_state[x][y][i] == 1:
+                                if i + 1 < 4:
+                                    new_walls[i + 1] = 1
+                                else:
+                                    new_walls[i - 3] = 1
+                        self.the_state[x][y][:4] = new_walls
+                for y in range(half_g, self.grid_size):
+                    if self.the_state[half_g][y][2] == 1:
+                        self.the_state[half_g - 1][y][0] = 1
+                for x in range(half_g, self.grid_size):
+                    if self.the_state[x][half_g][3] == 1:
+                        self.the_state[x][half_g - 1][1] = 1
+            elif quad == 3:
+                for x in range(0, half_g):
+                    for y in range(half_g, self.grid_size):
+                        self.the_state[x][y] = quad_state[half_g - x - 1][self.grid_size - y -1]
+                        new_walls = np.zeros(4)
+                        for i in range(4):
+                            if self.the_state[x][y][i] == 1:
+                                if i + 2 < 4:
+                                    new_walls[i + 2] = 1
+                                else:
+                                    new_walls[i - 2] = 1
+                        self.the_state[x][y][:4] = new_walls
+                for y in range(half_g, self.grid_size):
+                    if self.the_state[half_g - 1][y][0] == 1:
+                        self.the_state[half_g][y][2] = 1
+                for x in range(0, half_g):
+                    if self.the_state[x][half_g][3] == 1:
+                        self.the_state[x][half_g - 1][1] = 1
+            elif quad == 4:
+                for x in range(0, half_g):
+                    for y in range(0, half_g):
+                        self.the_state[x][y] = quad_state[half_g - y - 1][x]
+                        new_walls = np.zeros(4)
+                        for i in range(4):
+                            if self.the_state[x][y][i] == 1:
+                                if i + 3 < 4:
+                                    new_walls[i + 3] = 1
+                                else:
+                                    new_walls[i - 1] = 1
+                        self.the_state[x][y][:4] = new_walls
+                for y in range(0, half_g):
+                    if self.the_state[half_g - 1][y][0] == 1:
+                        self.the_state[half_g][y][2] = 1
+                for x in range(0, half_g):
+                    if self.the_state[x][half_g - 1][1] == 1:
+                        self.the_state[x][half_g][3] = 1
+
     def set_figures(self, style):
+        if style == 'none':
+            pass
         if style == 'same':
             self.add_single_figure([3, 3], 'red')
             self.add_single_figure([2, 3], 'green')
@@ -73,15 +221,17 @@ class environment():
                     poss.append((x, y))
                     self.add_single_figure([x, y], i)
 
-
     def set_current_goal(self, gol):
         if isinstance(gol, str):
             self.cur_goal_name = gol
             self.cur_goal = goals.index(self.cur_goal_name)
             self.cur_goal_pos = self.get_pos_on_board(self.the_state, self.cur_goal_name)
             self.cur_goal_color = get_goal_color(self.cur_goal_name)
-            self.reduced_state[self.cur_goal_pos[0]][self.cur_goal_pos[1]][4 + num_figures:4 + 2 * num_figures] = \
-                as_one_hot(self.cur_goal_color, num_figures)
+            if self.cur_goal_name != 'all':
+                self.reduced_state[self.cur_goal_pos[0]][self.cur_goal_pos[1]][4 + num_figures:4 + 2 * num_figures] = \
+                    hlp.as_one_hot(self.cur_goal_color, num_figures)
+            else:
+                self.reduced_state[self.cur_goal_pos[0]][self.cur_goal_pos[1]][4 + num_figures:4 + 2 * num_figures] = 1
             # print(self.the_state, self.reduced_state)
 
     def get_flattened_reduced_state(self):
@@ -91,7 +241,7 @@ class environment():
         if test is not None:
             if isinstance(test, str):
                 if test in figures:
-                    test = as_one_hot(figures.index(test), num_figures)
+                    test = hlp.as_one_hot(figures.index(test), num_figures)
                     for x in range(self.grid_size):
                         for y in range(self.grid_size):
                             if np.array_equal(state[x][y][4:4 + num_figures], test):
@@ -179,8 +329,8 @@ class environment():
             fig = get_id_from_name(fig, figures)
         if fig is not None and fig not in self.figs_on_board and fig < self.num_figures:
             if -1 < pos[0] < self.grid_size and -1 < pos[1] < self.grid_size:
-                self.the_state[pos[0]][pos[1]][4:4 + self.num_figures] = as_one_hot(fig, self.num_figures)
-                self.reduced_state[pos[0]][pos[1]][4:4 + self.num_figures] = as_one_hot(fig, self.num_figures)
+                self.the_state[pos[0]][pos[1]][4:4 + self.num_figures] = hlp.as_one_hot(fig, self.num_figures)
+                self.reduced_state[pos[0]][pos[1]][4:4 + self.num_figures] = hlp.as_one_hot(fig, self.num_figures)
                 self.figs_on_board.append(fig)
 
     def add_figures(self, pos_figures_tuples):
@@ -190,9 +340,10 @@ class environment():
     def add_single_goal(self, pos, gol):
         if isinstance(gol, str):
             gol = get_id_from_name(gol, goals)
-        if gol is not None and gol < self.num_goals:
+        if gol is not None and gol not in self.goals_on_board and gol < self.num_goals:
             if self.valid_x_y(pos[0], pos[1]):
                 self.the_state[pos[0]][pos[1]][4 + self.num_figures] = gol
+                self.goals_on_board.append(gol)
 
     def add_goals(self, pos_goal_tuples):
         for pos_goal in pos_goal_tuples:
@@ -206,7 +357,21 @@ class environment():
             self.add_single_wall(([0, y], [-1, y]))
             self.add_single_wall(([self.grid_size - 1, y], [self.grid_size, y]))
 
+    def add_quadrant_1(self):
+        for x in range(self.grid_size):
+            self.add_single_wall(([x, 0], [x, -1]))
+        for y in range(self.grid_size):
+            self.add_single_wall(([self.grid_size - 1, y], [self.grid_size, y]))
+        self.add_single_wall(([0, self.grid_size - 2], [0, self.grid_size - 1]))
+        self.add_single_wall(([0, self.grid_size - 1], [1, self.grid_size - 1]))
+
     def add_single_wall(self, between):
+        self.change_wall(between, 1)
+
+    def remove_single_wall(self, between):
+        self.change_wall(between, 0)
+
+    def change_wall(self, between, change=None):
         # between is a list of coordinate np.arrays
         p1 = between[0]
         p2 = between[1]
@@ -214,11 +379,17 @@ class environment():
         if (d[0] != 0 and d[1] != 0) or (abs(d[0]) > 1 or abs(d[1]) > 1):
             return
         if self.valid_x_y(p1[0], p1[1]):
-            self.the_state[p1[0]][p1[1]][:4] += get_wall_one_hot(d)
-            self.reduced_state[p1[0]][p1[1]][:4] += get_wall_one_hot(d)
+            p = get_wall_one_hot_pos(d)
+            if change is None:
+                change = abs(self.the_state[p1[0]][p1[1]][p] - 1)
+            self.the_state[p1[0]][p1[1]][p] = change
+            self.reduced_state[p1[0]][p1[1]][p] = change
         if self.valid_x_y(p2[0], p2[1]):
-            self.the_state[p2[0]][p2[1]][:4] += get_wall_one_hot(d, invert=True)
-            self.reduced_state[p2[0]][p2[1]][:4] += get_wall_one_hot(d, invert=True)
+            p = get_wall_one_hot_pos(d, invert=True)
+            if change is None:
+                change = abs(self.the_state[p2[0]][p2[1]][p] - 1)
+            self.the_state[p2[0]][p2[1]][p] = change
+            self.reduced_state[p2[0]][p2[1]][p] = change
 
     def add_walls(self, between):
         # between is a list of coordinate np.arrays
@@ -247,14 +418,14 @@ class environment():
             out[0] = '|'
         if pos[3] == 1:
             out[1] = '^'
-        figure = one_hot_to_id(pos[4:4 + num_figures])
+        figure = hlp.one_hot_to_id(pos[4:4 + num_figures])
         if not reduced:
             goal = pos[4 + num_figures]
             if goal > 0:
                 out[3:4] = goal_dict[goal][1]
         else:
             goal = pos[4 + num_figures:4 + 2 * num_figures]
-            goal = one_hot_to_id(goal)
+            goal = hlp.one_hot_to_id(goal)
             if goal > -1:
                 out[3] = fig_dict[goal][2]
                 out[4] = '*'
@@ -264,6 +435,10 @@ class environment():
 
     def valid_x_y(self, x, y):
         return -1 < x < self.grid_size and -1 < y < self.grid_size
+
+
+def load_state(filename):
+    return np.load(filename)
 
 
 def print_action(act):
@@ -284,6 +459,17 @@ def get_id_from_name(name, search_list):
             return idx
 
 
+def get_wall_one_hot_pos(d, invert=False):
+    if d[0] > 0 and not invert or d[0] < 0 and invert:
+        return 0
+    if d[1] > 0 and not invert or d[1] < 0 and invert:
+        return 1
+    if d[0] < 0 and not invert or d[0] > 0 and invert:
+        return 2
+    if d[1] < 0 and not invert or d[1] > 0 and invert:
+        return 3
+
+
 def get_wall_one_hot(d, invert=False):
     out = np.zeros(4, dtype=np.int)
     if d[0] > 0 and not invert or d[0] < 0 and invert:
@@ -296,15 +482,3 @@ def get_wall_one_hot(d, invert=False):
         out[3] = 1
     return out
 
-
-def as_one_hot(make_one_hot, num):
-    out = np.zeros(num, dtype=np.int)
-    out[make_one_hot] = 1
-    return out
-
-
-def one_hot_to_id(one_hot):
-    for idx in range(len(one_hot)):
-        if one_hot[idx] == 1:
-            return idx
-    return -1

@@ -212,7 +212,7 @@ def test_agent(agent):
 
 if __name__ == "__main__":
     # initialize gym environment and the agent
-    environment = envi.environment(4)
+    environment = envi.Environment(4)
     q_agent = Q_network(environment)
     q_agent.train(Q_network.experience_replay)
     test_agent(q_agent)
