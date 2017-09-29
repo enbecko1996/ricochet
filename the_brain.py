@@ -15,7 +15,7 @@ import math
 import gym
 from collections import deque
 import matplotlib.pyplot as plt
-import ricochet.hyperparameter as hp
+import ricochet.hyperparameter as hyperparameter
 import PyQt5 as qt
 
 import sys
@@ -23,18 +23,21 @@ from keras import backend as K
 
 import tensorflow as tf
 
+
 # ----------------DEBUG-----------------
 
 
 class stats_collector():
     collect_step_counts = True
+    collect_big_step_counts = True
     collect_n_last_games = 0
     collect_rewards = True
     steps = []
+    big_steps = []
     games = deque(maxlen=collect_n_last_games)
     reward = []
     diction = {'steps': (collect_step_counts, steps), 'games': (collect_n_last_games > 0, games),
-               'rewards': (collect_rewards, reward)}
+               'rewards': (collect_rewards, reward), 'big_steps': (collect_big_step_counts, big_steps)}
 
     def reset(self):
         self.steps.clear()
@@ -52,7 +55,7 @@ class stats_collector():
 
 class debugger():
     render = False
-    log_epoch = 200
+    log_epoch = 30
 
     def reset(self):
         pass
@@ -60,6 +63,7 @@ class debugger():
 
 stats = stats_collector()
 debug = debugger()
+
 
 # ---------------huber-------------------------------------
 
@@ -76,24 +80,31 @@ def huber_loss(y_true, y_pred):
 
 
 # -------------------- BRAIN ---------------------------
-from keras.models import Sequential
+from keras.models import Sequential, load_model
 from keras.layers import *
 from keras.optimizers import *
 
 
 class Brain:
-    def __init__(self, stateCnt, actionCnt):
+    def __init__(self, stateCnt, actionCnt, worker=None, feeder=None):
         self.stateCnt = stateCnt
         self.actionCnt = actionCnt
 
-        self.model = self._createModel()
-        self.model_ = self._createModel()
+        if worker is None:
+            self.model = self._createModel()
+        else:
+            self.model = load_model(worker)
+        if feeder is None:
+            self.model_ = self._createModel()
+        else:
+            self.model_ = load_model(feeder)
 
     def _createModel(self):
         model = Sequential()
 
-        model.add(Dense(units=164, activation='relu', input_dim=stateCnt))
-        model.add(Dense(units=actionCnt, activation='linear'))
+        model.add(Dense(units=200, activation='relu', input_dim=self.stateCnt))
+        model.add(Dense(units=200, activation='relu'))
+        model.add(Dense(units=self.actionCnt, activation='linear'))
 
         opt = RMSprop(lr=hp.LEARNING_RATE)
         model.compile(loss=huber_loss, optimizer=opt)
@@ -141,12 +152,15 @@ class Agent:
     steps = 0
     epsilon = hp.MAX_EPSILON
 
-    def __init__(self, state_count, action_count):
+    def __init__(self, state_count, action_count, worker=None, feeder=None):
+        print("hey9")
         self.stateCnt = state_count
         self.actionCnt = action_count
 
-        self.brain = Brain(state_count, action_count)
+        self.brain = Brain(state_count, action_count, worker, feeder)
+        print("hey91")
         self.memory = Memory(hp.MEMORY_CAPACITY)
+        print("hey6")
 
     def act(self, s):
         if random.random() < self.epsilon:
@@ -213,8 +227,9 @@ class Agent:
 
 
 class RandomAgent:
-    def __init__(self, action_count):
-        self.memory = Memory(hp.MEMORY_CAPACITY)
+    def __init__(self, handler, action_count):
+        self.handler = handler
+        self.memory = Memory(handler.hp.MEMORY_CAPACITY)
         self.actionCnt = action_count
 
     def act(self, s):
@@ -231,9 +246,6 @@ class RandomAgent:
 import ricochet.game as the_game
 
 
-board_style = [[2, 0], [3, 1], [6, 0], [0, 1]]
-
-
 class Environment:
     def __init__(self, problem=None):
         self.samples = []
@@ -243,7 +255,7 @@ class Environment:
             self.problem = problem
             self.my_env = gym.make(problem)
 
-    def run(self, current_agent):
+    def run(self, current_agent, board_style):
         s = self.my_env.reset(figure_style='random', board_style=board_style)
         total_reward = 0
 
@@ -269,7 +281,7 @@ class Environment:
                 break
         return steps, total_reward
 
-    def play_game(self, current_agent):
+    def play_game(self, current_agent, board_style):
         s = self.my_env.reset(figure_style='random', board_style=board_style)
         total_reward = 0
         steps = 0
@@ -297,15 +309,91 @@ class Environment:
 
 
 # -------------------- MAIN ----------------------------
-PROBLEM = 'CartPole-v0'
-import os
-print(os.getcwd())
-np.load("quadrants/pre_7.npy")
+import ricochet.helper as hlp
+import datetime
+from pathlib import Path
+
+
+brd_stl = [[2, 0], [3, 1], [6, 0], [0, 1]]
+
+
+class Handler:
+    def __init__(self, name, worker=None, feeder=None, hyperparams=None):
+        hlp.to_wrkdir()
+        if hyperparams is not None:
+            self.hp = hyperparams
+        self.the_environment = Environment(the_game.Environment(16, self.hp))
+        self.training = False
+        self.finished = False
+        self.save = True
+        self.name = name
+        self.stateCnt = self.the_environment.my_env.flattened_input_size
+        self.actionCnt = self.the_environment.my_env.action_size
+
+        self.agent = Agent(self.stateCnt, self.actionCnt, worker, feeder)
+        self.randomAgent = RandomAgent(self.actionCnt)
+
+    def set_hps(self, hyperparams):
+        self.hp = hyperparams
+
+    def initialize(self, board_style):
+        print("performing Random Agent")
+        while not self.randomAgent.memory.isFull():
+            self.the_environment.run(self.randomAgent, board_style)
+
+        self.agent.memory.samples = self.randomAgent.memory.samples
+        self.randomAgent = None
+
+    def start_training(self, board_style):
+        self.training = True
+        self.finished = False
+        self.save = True
+        epoch = 0
+        while epoch < hp.EPOCHS and self.training:
+            epoch += 1
+            steps, reward = self.the_environment.run(self.agent, board_style)
+            stats.collect('steps', steps)
+            stats.collect('rewards', reward)
+            if epoch % debug.log_epoch == 0:
+                print("\n\n__________________\nNEW GAME\n___________________")
+                game_steps, game_rewards = self.the_environment.play_game(self.agent, board_style)
+                print("game_steps = {}, game_reward = {}".format(game_steps, game_rewards))
+                print("avg. reward = {0}".format(np.mean(stats.reward[-debug.log_epoch:])))
+                print("episode: {}/{}, steps: {}".format(epoch, hp.EPOCHS, steps),
+                      "avg. steps last finishes {} = {}".format(debug.log_epoch,
+                                                                np.mean(stats.steps[-debug.log_epoch:])),
+                      "epsilon = {}".format(self.agent.epsilon))
+                stats.collect('big_steps', np.mean(stats.steps[-debug.log_epoch:]))
+                stats.steps.clear()
+        if self.save:
+            my_file = Path("models/" + self.name + "_worker.h5")
+            my_file_2 = Path("models/" + self.name + "_feeder.h5")
+            i = 0
+            while my_file.is_file() or my_file_2.is_file():
+                i += 1
+                print(i)
+                my_file = Path("models/" + self.name + "_worker_" + str(i) + ".h5")
+                my_file_2 = Path("models/" + self.name + "_feeder_" + str(i) + ".h5")
+            self.agent.brain.model.save(my_file)
+            self.agent.brain.model_.save(my_file_2)
+            np.save("models/" + self.name + "_stats", np.array(stats.big_steps))
+        self.finished = True
+        print("finished")
+
+    def stop_training(self):
+        self.save = False
+        self.training = False
+
+    def pause_training(self):
+        self.save = True
+        self.training = False
+
+
+"""PROBLEM = 'CartPole-v0'
 the_environment = Environment(the_game.Environment(16))
 
-
-"""stateCnt = env.env.observation_space.shape[0]
-actionCnt = env.env.action_space.n"""
+stateCnt = env.env.observation_space.shape[0]
+actionCnt = env.env.action_space.n
 
 stateCnt = the_environment.my_env.flattened_input_size
 actionCnt = the_environment.my_env.action_size
@@ -340,4 +428,4 @@ try:
                   "epsilon = {}".format(agent.epsilon))
 finally:
     print("saving")
-    agent.brain.model.save("cartpole-dqn.h5")
+    agent.brain.model.save("cartpole-dqn.h5")"""

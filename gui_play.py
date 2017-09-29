@@ -5,7 +5,7 @@ from PyQt5.QtCore import QSize, Qt, pyqtSlot
 from PyQt5.QtGui import QPainter, QColor
 from PyQt5.QtWidgets import (QWidget, QApplication, QMessageBox,
                              QDesktopWidget, QVBoxLayout, QHBoxLayout,
-                             QLineEdit, QPushButton)
+                             QLineEdit, QPushButton, QLabel, QGridLayout)
 from qtpy.QtGui import QIcon
 
 import ricochet.game as game
@@ -176,11 +176,16 @@ class Board(QWidget):
                 drawer.draw_fig(qp, (x, y), game, self.env.the_state[x][y][4:4 + game.num_figures], per_box)
                 drawer.draw_goal(qp, (x, y), game, self.env.the_state[x][y][4 + game.num_figures], per_box)
 
+# --------------------------MAIN-----------------------------------------
+import ricochet.the_brain as brain
+from threading import Thread
+from pathlib import Path
+
 
 class RicochetGui(QWidget):
     def __init__(self):
         super().__init__()
-
+        self.brain_handler = None
         self.initUI()
 
     def initUI(self):
@@ -204,16 +209,81 @@ class RicochetGui(QWidget):
         self.clear.clicked.connect(self.clear_click)
         self.clear.resize(20, 50)
 
+        self.name_lab = QLabel("name: ", self)
+        self.name = QLineEdit(self)
+
+        self.board_lab = QLabel("style: ", self)
+        self.board_style = QLineEdit(self)
+
+        self.load_lab = QLabel("load: ", self)
+        self.load_name = QLineEdit(self)
+
+        self.newest = QPushButton("newest", self)
+        self.newest.clicked.connect(self.load_newest_click)
+        self.version_lab = QLabel("version: ", self)
+        self.version = QLineEdit(self)
+        self.version_push = QPushButton("load", self)
+        self.version_push.clicked.connect(self.load_vers_click)
+
+        h_vers = QHBoxLayout()
+        h_vers.addWidget(self.version_lab)
+        h_vers.addWidget(self.version)
+        h_vers.addWidget(self.version_push)
+
+        grid = QGridLayout()
+        grid.setSpacing(10)
+
+        grid.addWidget(self.load_lab, 1, 0)
+        grid.addWidget(self.load_name, 1, 1)
+
+        grid.addWidget(self.newest, 2, 0)
+        grid.addLayout(h_vers, 2, 1)
+
+        grid.addWidget(self.name_lab, 3, 0)
+        grid.addWidget(self.name, 3, 1)
+
+        grid.addWidget(self.board_lab, 4, 0)
+        grid.addWidget(self.board_style, 4, 1)
+
+        self.train = QPushButton('train', self)
+        self.train.clicked.connect(self.train_click)
+
+        self.pause_train = QPushButton('pause training', self)
+        self.pause_train.clicked.connect(self.pause_click)
+
+        self.stop_train = QPushButton('stop training', self)
+        self.stop_train.clicked.connect(self.stop_click)
+
+        self.error = QLabel('', self)
+
+        vbox_2 = QVBoxLayout()
+        vbox_2.setAlignment(Qt.AlignTop)
+        vbox_2.addLayout(grid)
+        vbox_2.addWidget(self.train)
+        vbox_2.addWidget(self.pause_train)
+        vbox_2.addWidget(self.stop_train)
+        vbox_2.addWidget(self.error)
+
         vbox = QVBoxLayout()
-        vbox.setAlignment(Qt.AlignCenter)
+        vbox.setAlignment(Qt.AlignTop)
         vbox.addWidget(self.file_name)
         vbox.addWidget(self.save)
         vbox.addWidget(self.clear)
 
+        vbox_3 = QVBoxLayout()
+
+        v_main = QVBoxLayout()
+        v_main.setAlignment(Qt.AlignTop)
+        v_main.addLayout(vbox_2)
+        v_main.addStretch(1)
+        v_main.addLayout(vbox)
+        v_main.addStretch(1)
+        v_main.addLayout(vbox_3)
+
         hbox = QHBoxLayout()
         hbox.setAlignment(Qt.AlignLeft)
         hbox.addWidget(self.board)
-        hbox.addLayout(vbox)
+        hbox.addLayout(v_main)
         self.setLayout(hbox)
 
         self.show()
@@ -227,6 +297,64 @@ class RicochetGui(QWidget):
     def clear_click(self):
         self.board.clear()
         self.board.update()
+
+    @pyqtSlot()
+    def train_click(self):
+        thread = Thread(target=self.start_train)
+        thread.start()
+
+    def start_train(self):
+        if self.brain_handler is None:
+            self.brain_handler = brain.Handler(self.name.text())
+        style = self.board_style.text()
+        if style == 'same':
+            style = [[2, 0], [3, 1], [6, 0], [0, 1]]
+        elif style == 'random':
+            pass
+        else:
+            self.error.setText("specified style is invalid")
+            return
+        self.brain_handler.initialize(style)
+        self.brain_handler.start_training(style)
+
+    @pyqtSlot()
+    def pause_click(self):
+        self.brain_handler.pause_training()
+
+    @pyqtSlot()
+    def stop_click(self):
+        self.brain_handler.stop_training()
+
+    @pyqtSlot()
+    def load_newest_click(self):
+        name = self.load_name.text()
+        my_file = Path("models/" + name + "_worker.h5")
+        my_file_2 = Path("models/" + name + "_feeder.h5")
+        i = 0
+        while my_file.is_file() or my_file_2.is_file():
+            i += 1
+            print(i)
+            my_file = Path("models/" + name + "_worker_" + str(i) + ".h5")
+            my_file_2 = Path("models/" + name + "_feeder_" + str(i) + ".h5")
+        if i > 0:
+            my_file = Path("models/" + name + "_worker_" + str(i - 1) + ".h5")
+            my_file_2 = Path("models/" + name + "_feeder_" + str(i - 1) + ".h5")
+            self.name.setText(name)
+            self.brain_handler = brain.Handler(name, my_file, my_file_2)
+        else:
+            self.error.setText("failed to load: " + name)
+
+    @pyqtSlot()
+    def load_vers_click(self):
+        name = self.load_name.text()
+        vers = str(self.version.text())
+        my_file = Path("models/" + name + "_worker_" + vers + ".h5")
+        my_file_2 = Path("models/" + name + "_feeder_" + vers + ".h5")
+        if my_file.is_file() and my_file_2.is_file():
+            self.brain_handler = brain.Handler(name, my_file, my_file_2)
+            self.name.setText(name)
+        else:
+            self.error.setText("failed to load: " + name + " with vers.: " + vers)
 
     def closeEvent(self, event):
         reply = QMessageBox.question(self, 'Message',
@@ -246,6 +374,9 @@ class RicochetGui(QWidget):
 
 
 if __name__ == '__main__':
+    import os
+
+    print(os.getcwd())
     app = QApplication(sys.argv)
     gui = RicochetGui()
     sys.exit(app.exec_())

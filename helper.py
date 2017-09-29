@@ -72,6 +72,14 @@ def load_state(filename):
     return np.load(filename)
 
 
+def to_wrkdir():
+    import os
+    try:
+        print(os.getcwd())
+        os.chdir("ricochet")
+    except FileNotFoundError:
+        pass
+
 """for i in range(8):
     for j in range(2):
         states = load_state("quadrants/pre_"+str(i)+"_"+str(j)+".npy")
@@ -86,3 +94,4 @@ def load_state(filename):
 for i in range(8):
     lis.append(load_state("quadrants/pre_" + str(i) + ".npy"))
 np.save("quadrants/pre_all", np.array(lis))"""
+
