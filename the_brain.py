@@ -9,19 +9,15 @@
 #
 # author: Jaromir Janisch, 2016
 
-import random
-import numpy
 import math
-import gym
+import random
 from collections import deque
+
+import gym
 import matplotlib.pyplot as plt
+import numpy
+
 import ricochet.hyperparameter as hyperparameter
-import PyQt5 as qt
-
-import sys
-from keras import backend as K
-
-import tensorflow as tf
 
 
 # ----------------DEBUG-----------------
@@ -66,13 +62,15 @@ debug = debugger()
 
 
 # ---------------huber-------------------------------------
+HUBER_LOSS_DELTA = 1.0
+
 
 def huber_loss(y_true, y_pred):
     err = y_true - y_pred
 
-    cond = K.abs(err) < hp.HUBER_LOSS_DELTA
+    cond = K.abs(err) < HUBER_LOSS_DELTA
     L2 = 0.5 * K.square(err)
-    L1 = hp.HUBER_LOSS_DELTA * (K.abs(err) - 0.5 * hp.HUBER_LOSS_DELTA)
+    L1 = HUBER_LOSS_DELTA * (K.abs(err) - 0.5 * HUBER_LOSS_DELTA)
 
     loss = tf.where(cond, L2, L1)  # Keras does not cover where function in tensorflow :-(
 
@@ -86,33 +84,44 @@ from keras.optimizers import *
 
 
 class Brain:
-    def __init__(self, stateCnt, actionCnt, worker=None, feeder=None):
+    def __init__(self, handler, conv=False, stateCnt=0, actionCnt=0, grid_size=0, dims=0, worker=None, feeder=None):
+        self.handler = handler
+        self.conv = conv
         self.stateCnt = stateCnt
         self.actionCnt = actionCnt
+        self.grid_size = grid_size
+        self.dims = dims
 
         if worker is None:
             self.model = self._createModel()
         else:
-            self.model = load_model(worker)
+            self.model = load_model(worker, custom_objects={'huber_loss': huber_loss})
         if feeder is None:
             self.model_ = self._createModel()
         else:
-            self.model_ = load_model(feeder)
+            self.model_ = load_model(feeder, custom_objects={'huber_loss': huber_loss})
 
     def _createModel(self):
         model = Sequential()
 
-        model.add(Dense(units=200, activation='relu', input_dim=self.stateCnt))
-        model.add(Dense(units=200, activation='relu'))
-        model.add(Dense(units=self.actionCnt, activation='linear'))
+        if self.conv:
+            model.add(Conv2D(30, kernel_size=4, padding='same', input_shape=(self.grid_size, self.grid_size, self.dims)))
+            model.add(MaxPooling2D())
+            model.add(Flatten())
+            model.add(Dense(units=80, activation='relu'))
+            model.add(Dense(units=self.actionCnt, activation='linear'))
+        else:
+            model.add(Dense(units=100, activation='relu', input_dim=self.stateCnt))
+            model.add(Dense(units=200, activation='relu'))
+            model.add(Dense(units=self.actionCnt, activation='linear'))
 
-        opt = RMSprop(lr=hp.LEARNING_RATE)
+        opt = RMSprop(lr=self.handler.hp.LEARNING_RATE)
         model.compile(loss=huber_loss, optimizer=opt)
 
         return model
 
     def train(self, x, y, epochs=1, verbose=0):
-        self.model.fit(x, y, batch_size=hp.BATCH_SIZE, epochs=epochs, verbose=verbose)
+        self.model.fit(x, y, batch_size=self.handler.hp.BATCH_SIZE, epochs=epochs, verbose=verbose)
 
     def predict(self, s, target=False):
         if target:
@@ -121,7 +130,7 @@ class Brain:
             return self.model.predict(s)
 
     def predictOne(self, s, target=False):
-        return self.predict(s.reshape(1, self.stateCnt), target=target).flatten()
+        return self.predict(np.expand_dims(s, 0), target=target).flatten()
 
     def updateTargetModel(self):
         self.model_.set_weights(self.model.get_weights())
@@ -149,18 +158,18 @@ class Memory:  # stored as ( s, a, r, s_ )
 
 # -------------------- AGENT ---------------------------
 class Agent:
-    steps = 0
-    epsilon = hp.MAX_EPSILON
-
-    def __init__(self, state_count, action_count, worker=None, feeder=None):
-        print("hey9")
+    def __init__(self, handler, conv=False, state_count=0, action_count=0, grid_size=0, dims=0, worker=None, feeder=None):
+        self.handler = handler
+        self.steps = 0
+        self.epsilon = self.handler.hp.MAX_EPSILON
+        self.conv = conv
         self.stateCnt = state_count
         self.actionCnt = action_count
+        print("hey45")
 
-        self.brain = Brain(state_count, action_count, worker, feeder)
-        print("hey91")
-        self.memory = Memory(hp.MEMORY_CAPACITY)
+        self.brain = Brain(self.handler, conv, state_count, action_count, grid_size, dims, worker, feeder)
         print("hey6")
+        self.memory = Memory(handler.hp.MEMORY_CAPACITY)
 
     def act(self, s):
         if random.random() < self.epsilon:
@@ -171,7 +180,7 @@ class Agent:
     def observe(self, sample):  # in (s, a, r, s_) format
         self.memory.add(sample)
 
-        if self.steps % hp.UPDATE_TARGET_FREQUENCY == 0:
+        if self.steps % self.handler.hp.UPDATE_TARGET_FREQUENCY == 0:
             self.brain.updateTargetModel()
 
         # debug the Q function in poin S
@@ -183,13 +192,17 @@ class Agent:
 
         # slowly decrease Epsilon based on our eperience
         self.steps += 1
-        self.epsilon = hp.MIN_EPSILON + (hp.MAX_EPSILON - hp.MIN_EPSILON) * math.exp(-hp.LAMBDA * self.steps)
+        self.epsilon = self.handler.hp.MIN_EPSILON + (self.handler.hp.MAX_EPSILON - self.handler.hp.MIN_EPSILON) \
+                                                    * math.exp(-self.handler.hp.LAMBDA * self.steps)
 
     def replay(self):
-        batch = self.memory.sample(hp.BATCH_SIZE)
+        batch = self.memory.sample(self.handler.hp.BATCH_SIZE)
         batchLen = len(batch)
 
-        no_state = numpy.zeros(self.stateCnt)
+        if not self.conv:
+            no_state = numpy.zeros(self.stateCnt)
+        else:
+            no_state = numpy.zeros_like(batch[0][0])
 
         states = numpy.array([o[0] for o in batch])
         states_ = numpy.array([(no_state if o[3] is None else o[3]) for o in batch])
@@ -197,7 +210,11 @@ class Agent:
         p = self.brain.predict(states)
         p_ = self.brain.predict(states_, target=True)
 
-        x = numpy.zeros((batchLen, self.stateCnt))
+        if not self.conv:
+            x = numpy.zeros((batchLen, self.stateCnt))
+        else:
+            base_shape = batch[0][0].shape
+            x = numpy.zeros((batchLen, base_shape[0], base_shape[1], base_shape[2]))
         y = numpy.zeros((batchLen, self.actionCnt))
 
         # print("\n\n___________________________\nNEW replay\n__________________________")
@@ -212,7 +229,7 @@ class Agent:
             if s_ is None:
                 t[a] = r
             else:
-                t[a] = r + hp.GAMMA * numpy.amax(p_[i])
+                t[a] = r + self.handler.hp.GAMMA * numpy.amax(p_[i])
 
             x[i] = s
             y[i] = list(t)
@@ -256,7 +273,7 @@ class Environment:
             self.my_env = gym.make(problem)
 
     def run(self, current_agent, board_style):
-        s = self.my_env.reset(figure_style='random', board_style=board_style)
+        s = self.my_env.reset(flattened=False, figure_style='random', board_style=board_style)
         total_reward = 0
 
         steps = 0
@@ -266,39 +283,41 @@ class Environment:
             steps += 1
             a = current_agent.act(s)
 
-            s_, r, done, info = self.my_env.step(a)
+            s_, r, done, info = self.my_env.step(a, flattened=False)
 
             if done:  # terminal state
                 s_ = None
-
             current_agent.observe((s, a, r, s_))
-            current_agent.replay()
+            if steps % current_agent.handler.hp.REPLAY == 0:
+                current_agent.replay()
 
             s = s_
             total_reward += r
 
             if done:
                 break
+        if steps < current_agent.handler.hp.REPLAY:
+            current_agent.replay()
         return steps, total_reward
 
     def play_game(self, current_agent, board_style):
-        s = self.my_env.reset(figure_style='random', board_style=board_style)
+        s = self.my_env.reset(flattened=False, figure_style='random', board_style=board_style)
         total_reward = 0
         steps = 0
         while steps < 500:
             steps += 1
-            self.my_env.render()
+            # self.my_env.render()
             prediction = current_agent.brain.predictOne(s)
-            print(prediction)
+            # print(prediction)
             if random.random() < 0.05:
-                print("random")
+                # print("random")
                 a = random.randint(0, current_agent.actionCnt - 1)
             else:
                 a = numpy.argmax(prediction)
-            print("max = {}, {}, taken = {}, {}".format(numpy.argmax(prediction),
+            """print("max = {}, {}, taken = {}, {}".format(numpy.argmax(prediction),
                                                         the_game.print_action(numpy.argmax(prediction)), a,
-                                                        the_game.print_action(a)))
-            s_, r, done, info = self.my_env.step(a)
+                                                        the_game.print_action(a)))"""
+            s_, r, done, info = self.my_env.step(a, flattened=False)
             if done:  # terminal state
                 s_ = None
             s = s_
@@ -310,16 +329,21 @@ class Environment:
 
 # -------------------- MAIN ----------------------------
 import ricochet.helper as hlp
-import datetime
 from pathlib import Path
+import ricochet.gui_train as status_gui
 
+import numpy as np
+import os
+import json
 
 brd_stl = [[2, 0], [3, 1], [6, 0], [0, 1]]
 
 
 class Handler:
-    def __init__(self, name, worker=None, feeder=None, hyperparams=None):
+    def __init__(self, name, version, worker=None, feeder=None, hyperparams=None):
         hlp.to_wrkdir()
+        self.gui = None
+        self.hp = hyperparameter.hyperparams()
         if hyperparams is not None:
             self.hp = hyperparams
         self.the_environment = Environment(the_game.Environment(16, self.hp))
@@ -327,16 +351,26 @@ class Handler:
         self.finished = False
         self.save = True
         self.name = name
+        self.version = version
         self.stateCnt = self.the_environment.my_env.flattened_input_size
         self.actionCnt = self.the_environment.my_env.action_size
-
-        self.agent = Agent(self.stateCnt, self.actionCnt, worker, feeder)
-        self.randomAgent = RandomAgent(self.actionCnt)
+        self.agent = None
+        self.randomAgent = None
+        self.worker = worker
+        self.feeder = feeder
+        self.minimum = self.hp.MINIMUM_CAPTURE_THRESH
+        self.folder = Path("models/" + self.name)
+        self.min_folder = Path(str(self.folder) + "/" + str(self.version) + "/local min")
 
     def set_hps(self, hyperparams):
         self.hp = hyperparams
 
     def initialize(self, board_style):
+        self.agent = Agent(self, conv=True, action_count=self.actionCnt, state_count=self.stateCnt,
+                           grid_size=16, dims=4 + 2 * the_game.num_figures,
+                           worker=self.worker, feeder=self.feeder)
+        self.randomAgent = RandomAgent(self, self.actionCnt)
+
         print("performing Random Agent")
         while not self.randomAgent.memory.isFull():
             self.the_environment.run(self.randomAgent, board_style)
@@ -348,43 +382,65 @@ class Handler:
         self.training = True
         self.finished = False
         self.save = True
+        if not os.path.exists(self.min_folder):
+            os.makedirs(self.min_folder)
         epoch = 0
-        while epoch < hp.EPOCHS and self.training:
+        print("Starting Training")
+        while epoch < self.hp.EPOCHS and self.training:
             epoch += 1
             steps, reward = self.the_environment.run(self.agent, board_style)
             stats.collect('steps', steps)
             stats.collect('rewards', reward)
             if epoch % debug.log_epoch == 0:
-                print("\n\n__________________\nNEW GAME\n___________________")
+                avg_steps = np.mean(stats.steps[-debug.log_epoch:])
+                if avg_steps < self.minimum:
+                    self.agent.brain.model.save(str(self.min_folder) + "/worker_" + str(avg_steps) + ".h5")
+                    self.agent.brain.model_.save(str(self.min_folder) + "/feeder_" + str(avg_steps) + ".h5")
+                    self.minimum = avg_steps
+                print("__________________\nNEW GAME\n___________________")
                 game_steps, game_rewards = self.the_environment.play_game(self.agent, board_style)
                 print("game_steps = {}, game_reward = {}".format(game_steps, game_rewards))
                 print("avg. reward = {0}".format(np.mean(stats.reward[-debug.log_epoch:])))
-                print("episode: {}/{}, steps: {}".format(epoch, hp.EPOCHS, steps),
+                print("episode: {}/{}, steps: {}".format(epoch, self.hp.EPOCHS, steps),
                       "avg. steps last finishes {} = {}".format(debug.log_epoch,
-                                                                np.mean(stats.steps[-debug.log_epoch:])),
+                                                                avg_steps),
                       "epsilon = {}".format(self.agent.epsilon))
-                stats.collect('big_steps', np.mean(stats.steps[-debug.log_epoch:]))
+                if self.gui is not None:
+                    self.gui.add_data_point(epoch, avg_steps)
+                    self.gui.plot()
+                stats.collect('big_steps', avg_steps)
                 stats.steps.clear()
         if self.save:
-            my_file = Path("models/" + self.name + "_worker.h5")
-            my_file_2 = Path("models/" + self.name + "_feeder.h5")
-            i = 0
-            while my_file.is_file() or my_file_2.is_file():
-                i += 1
-                print(i)
-                my_file = Path("models/" + self.name + "_worker_" + str(i) + ".h5")
-                my_file_2 = Path("models/" + self.name + "_feeder_" + str(i) + ".h5")
-            self.agent.brain.model.save(my_file)
-            self.agent.brain.model_.save(my_file_2)
-            np.save("models/" + self.name + "_stats", np.array(stats.big_steps))
+            self.save_model()
         self.finished = True
-        print("finished")
+        print("finished training")
+
+    def save_model(self):
+        folder = str(self.folder)
+        my_file = Path(folder + "/0/worker.h5")
+        my_file_2 = Path(folder + "/0/feeder.h5")
+        i = 0
+        while my_file.is_file() or my_file_2.is_file():
+            i += 1
+            print(i)
+            my_file = Path(folder + "/" + str(i) + "/worker.h5")
+            my_file_2 = Path(folder + "/" + str(i) + "/feeder.h5")
+        self.agent.brain.model.save(my_file)
+        self.agent.brain.model_.save(my_file_2)
+        np.save(folder + "/" + str(i) + "/stats", np.array(stats.big_steps))
+        with open(folder + "/" + str(i) + "/hp.txt", 'w') as outfile:
+            json.dump(self.hp.__dict__, outfile)
+
+    def make_status_gui(self):
+        self.gui = status_gui.Status(self)
 
     def stop_training(self):
+        print("Stopping Training")
         self.save = False
         self.training = False
 
     def pause_training(self):
+        print("Pausing Training")
         self.save = True
         self.training = False
 

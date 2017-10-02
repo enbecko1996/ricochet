@@ -60,7 +60,7 @@ action_size = len(actions)
 
 
 class Environment:
-    def __init__(self, g_size, hyperparams):
+    def __init__(self, g_size, hyperparams=None):
         self.the_state = np.zeros((g_size, g_size, 4 + num_figures + 1), dtype=np.int)
         self.reduced_state = np.zeros((g_size, g_size, 4 + num_figures + num_figures), dtype=np.int)
         self.grid_size = g_size
@@ -87,24 +87,28 @@ class Environment:
         self.figs_on_board.clear()
         self.goals_on_board.clear()
         if isinstance(board_style, str) and board_style == 'random':
-            taken = list(range(len(all_quadrants)))
-            for i in range(4):
-                idx = rand.randrange(0, len(taken))
-                next_quad = taken[idx]
-                del taken[idx]
-                style = rand.randrange(0, 2) if next_quad < 4 else 1
-                self.set_quadrant(i + 1, all_quadrants[next_quad][style])
+            self.set_random_board()
         elif board_style is not None:
             for i in range(4):
                 self.set_quadrant(i + 1, all_quadrants[board_style[i][0]][board_style[i][1]])
         self.set_figures(figure_style)
-        if len(self.goals_on_board) > 0:
-            self.set_current_goal(goals[self.goals_on_board[rand.randrange(0, len(self.goals_on_board))]])
+        self.set_current_goal('green_square')
+        """if len(self.goals_on_board) > 0:
+            self.set_current_goal(goals[self.goals_on_board[rand.randrange(0, len(self.goals_on_board))]])"""
         self.cleanup()
         if flattened:
             return self.get_flattened_reduced_state()
         else:
-            return self.reduced_state
+            return np.array(self.reduced_state)
+
+    def set_random_board(self):
+        taken = list(range(len(all_quadrants)))
+        for i in range(4):
+            idx = rand.randrange(0, len(taken))
+            next_quad = taken[idx]
+            del taken[idx]
+            style = rand.randrange(0, 2) if next_quad < 4 else 1
+            self.set_quadrant(i + 1, all_quadrants[next_quad][style])
 
     def save_current_game(self, filename):
         np.save(filename, self.the_state)

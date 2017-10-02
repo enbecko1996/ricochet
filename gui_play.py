@@ -3,8 +3,7 @@ import sys
 import numpy as np
 from PyQt5.QtCore import QSize, Qt, pyqtSlot
 from PyQt5.QtGui import QPainter, QColor
-from PyQt5.QtWidgets import (QWidget, QApplication, QMessageBox,
-                             QDesktopWidget, QVBoxLayout, QHBoxLayout,
+from PyQt5.QtWidgets import (QWidget, QApplication, QDesktopWidget, QVBoxLayout, QHBoxLayout,
                              QLineEdit, QPushButton, QLabel, QGridLayout)
 from qtpy.QtGui import QIcon
 
@@ -178,14 +177,16 @@ class Board(QWidget):
 
 # --------------------------MAIN-----------------------------------------
 import ricochet.the_brain as brain
-from threading import Thread
 from pathlib import Path
+import tensorflow as tf
+import ricochet.gui_hps as gui_hps
 
 
 class RicochetGui(QWidget):
     def __init__(self):
         super().__init__()
         self.brain_handler = None
+        self.graph = None
         self.initUI()
 
     def initUI(self):
@@ -248,20 +249,12 @@ class RicochetGui(QWidget):
         self.train = QPushButton('train', self)
         self.train.clicked.connect(self.train_click)
 
-        self.pause_train = QPushButton('pause training', self)
-        self.pause_train.clicked.connect(self.pause_click)
-
-        self.stop_train = QPushButton('stop training', self)
-        self.stop_train.clicked.connect(self.stop_click)
-
         self.error = QLabel('', self)
 
         vbox_2 = QVBoxLayout()
         vbox_2.setAlignment(Qt.AlignTop)
         vbox_2.addLayout(grid)
         vbox_2.addWidget(self.train)
-        vbox_2.addWidget(self.pause_train)
-        vbox_2.addWidget(self.stop_train)
         vbox_2.addWidget(self.error)
 
         vbox = QVBoxLayout()
@@ -290,22 +283,22 @@ class RicochetGui(QWidget):
 
     @pyqtSlot()
     def save_click(self):
+        self.error.clear()
         file_name = self.file_name.text()
         self.board.save(file_name)
 
     @pyqtSlot()
     def clear_click(self):
+        self.error.clear()
         self.board.clear()
         self.board.update()
 
     @pyqtSlot()
     def train_click(self):
-        thread = Thread(target=self.start_train)
-        thread.start()
+        self.hp_tweak = gui_hps.HyperParameters(self)
+        self.hp_tweak.show()
 
     def start_train(self):
-        if self.brain_handler is None:
-            self.brain_handler = brain.Handler(self.name.text())
         style = self.board_style.text()
         if style == 'same':
             style = [[2, 0], [3, 1], [6, 0], [0, 1]]
@@ -314,57 +307,61 @@ class RicochetGui(QWidget):
         else:
             self.error.setText("specified style is invalid")
             return
-        self.brain_handler.initialize(style)
-        self.brain_handler.start_training(style)
-
-    @pyqtSlot()
-    def pause_click(self):
-        self.brain_handler.pause_training()
-
-    @pyqtSlot()
-    def stop_click(self):
-        self.brain_handler.stop_training()
+        if self.graph is not None:
+            with self.graph.as_default():
+                self.brain_handler.initialize(style)
+                self.brain_handler.start_training(style)
+        else:
+            self.brain_handler.initialize(style)
+            self.brain_handler.start_training(style)
 
     @pyqtSlot()
     def load_newest_click(self):
+        self.error.clear()
         name = self.load_name.text()
-        my_file = Path("models/" + name + "_worker.h5")
-        my_file_2 = Path("models/" + name + "_feeder.h5")
-        i = 0
-        while my_file.is_file() or my_file_2.is_file():
-            i += 1
-            print(i)
-            my_file = Path("models/" + name + "_worker_" + str(i) + ".h5")
-            my_file_2 = Path("models/" + name + "_feeder_" + str(i) + ".h5")
-        if i > 0:
-            my_file = Path("models/" + name + "_worker_" + str(i - 1) + ".h5")
-            my_file_2 = Path("models/" + name + "_feeder_" + str(i - 1) + ".h5")
-            self.name.setText(name)
-            self.brain_handler = brain.Handler(name, my_file, my_file_2)
-        else:
-            self.error.setText("failed to load: " + name)
+        folder = Path("models/" + name)
+        if folder.is_dir():
+            folder = str(folder)
+            my_file = Path(folder + "/0/worker.h5")
+            my_file_2 = Path(folder + "/0/feeder.h5")
+            i = 0
+            while my_file.is_file() or my_file_2.is_file():
+                i += 1
+                print(i)
+                my_file = Path(folder + "/" + str(i) + "/worker.h5")
+                my_file_2 = Path(folder + "/" + str(i) + "/feeder.h5")
+            if i > 0:
+                if i > 1:
+                    my_file = Path(folder + "/" + str(i) + "/worker.h5")
+                    my_file_2 = Path(folder + "/" + str(i) + "/feeder.h5")
+                else:
+                    my_file = Path(folder + "/0/worker.h5")
+                    my_file_2 = Path(folder + "/0/feeder.h5")
+                self.name.setText(name)
+                self.brain_handler = brain.Handler(name, i, worker=my_file, feeder=my_file_2)
+                self.graph = tf.get_default_graph()
+                return
+        self.error.setText("failed to load: " + name)
 
     @pyqtSlot()
     def load_vers_click(self):
+        self.error.clear()
         name = self.load_name.text()
+        folder = Path("models/" + name)
         vers = str(self.version.text())
-        my_file = Path("models/" + name + "_worker_" + vers + ".h5")
-        my_file_2 = Path("models/" + name + "_feeder_" + vers + ".h5")
-        if my_file.is_file() and my_file_2.is_file():
-            self.brain_handler = brain.Handler(name, my_file, my_file_2)
-            self.name.setText(name)
-        else:
-            self.error.setText("failed to load: " + name + " with vers.: " + vers)
+        if folder.is_dir():
+            folder = str(folder)
+            my_file = Path(folder + "/" + vers + "/worker.h5")
+            my_file_2 = Path(folder + "/" + vers + "/feeder.h5")
+            if my_file.is_file() and my_file_2.is_file():
+                self.brain_handler = brain.Handler(name, vers, worker=my_file, feeder=my_file_2)
+                self.graph = tf.get_default_graph()
+                self.name.setText(name)
+                return
+        self.error.setText("failed to load: " + name + " with vers.: " + vers)
 
     def closeEvent(self, event):
-        reply = QMessageBox.question(self, 'Message',
-                                     "Are you sure to quit?", QMessageBox.Yes |
-                                     QMessageBox.No, QMessageBox.No)
-
-        if reply == QMessageBox.Yes:
-            event.accept()
-        else:
-            event.ignore()
+        event.accpt()
 
     def center(self):
         qr = self.frameGeometry()
