@@ -1,8 +1,8 @@
 import numpy as np
-import ricochet.hyperparameter as hp
+import hyperparameter as hp
 import random as rand
-import ricochet.game_items_drawer as g
-import ricochet.helper as hlp
+import game_items_drawer as g
+import helper as hlp
 
 grid_size = 4
 figures = ['red', 'green', 'blue', 'yellow', 'grey']

@@ -3,8 +3,8 @@ from keras.layers.core import Dense, Dropout, Activation
 from keras.optimizers import Adam, RMSprop
 import numpy as np
 import random as rand
-import ricochet.game as envi
-import ricochet.hyperparameter as hp
+import game as envi
+import hyperparameter as hp
 import matplotlib.pyplot as plt
 import atexit
 from collections import deque

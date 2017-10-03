@@ -7,9 +7,9 @@ from PyQt5.QtWidgets import (QWidget, QApplication, QDesktopWidget, QVBoxLayout,
                              QLineEdit, QPushButton, QLabel, QGridLayout)
 from qtpy.QtGui import QIcon
 
-import ricochet.game as game
-import ricochet.game_items_drawer as drawer
-from ricochet.game import Environment
+import game as game
+import game_items_drawer as drawer
+from game import Environment
 
 
 class Picker(QWidget):
@@ -176,10 +176,10 @@ class Board(QWidget):
                 drawer.draw_goal(qp, (x, y), game, self.env.the_state[x][y][4 + game.num_figures], per_box)
 
 # --------------------------MAIN-----------------------------------------
-import ricochet.the_brain as brain
+import the_brain as brain
 from pathlib import Path
 import tensorflow as tf
-import ricochet.gui_hps as gui_hps
+import gui_hps as gui_hps
 
 
 class RicochetGui(QWidget):

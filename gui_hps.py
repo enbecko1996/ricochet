@@ -6,9 +6,9 @@ from PyQt5.QtWidgets import (QWidget, QApplication, QDesktopWidget, QVBoxLayout,
                              QPushButton, QLabel, QLineEdit)
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from qtpy.QtGui import QIcon
-import ricochet.hyperparameter as hp
+import hyperparameter as hp
 from threading import Thread
-import ricochet.the_brain as brain
+import the_brain as brain
 
 
 class HyperParameters(QWidget):

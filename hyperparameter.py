@@ -6,6 +6,7 @@ class hyperparams:
         self.in_wall_reward = -5.
 
         # neural_net
+        self.MAX_STEPS = 300
         self.EPOCHS = 75000
         self.LEARNING_RATE = 0.01
 

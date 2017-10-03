@@ -13,11 +13,12 @@ import math
 import random
 from collections import deque
 
-import gym
+# import gym
 import matplotlib.pyplot as plt
 import numpy
+import tensorflow as tf
 
-import ricochet.hyperparameter as hyperparameter
+import hyperparameter as hyperparameter
 
 
 # ----------------DEBUG-----------------
@@ -260,7 +261,7 @@ class RandomAgent:
 
 
 # -------------------- ENVIRONMENT ---------------------
-import ricochet.game as the_game
+import game as the_game
 
 
 class Environment:
@@ -269,15 +270,16 @@ class Environment:
         if isinstance(problem, the_game.Environment):
             self.my_env = problem
         else:
-            self.problem = problem
-            self.my_env = gym.make(problem)
+            pass
+            # self.problem = problem
+            # self.my_env = gym.make(problem)
 
     def run(self, current_agent, board_style):
         s = self.my_env.reset(flattened=False, figure_style='random', board_style=board_style)
         total_reward = 0
 
         steps = 0
-        while steps < 300:
+        while steps < current_agent.handler.hp.MAX_STEPS:
             # self.env.render()
 
             steps += 1
@@ -328,13 +330,14 @@ class Environment:
 
 
 # -------------------- MAIN ----------------------------
-import ricochet.helper as hlp
+import helper as hlp
 from pathlib import Path
-import ricochet.gui_train as status_gui
+import gui_train as status_gui
 
 import numpy as np
 import os
 import json
+import datetime
 
 brd_stl = [[2, 0], [3, 1], [6, 0], [0, 1]]
 
@@ -361,6 +364,7 @@ class Handler:
         self.minimum = self.hp.MINIMUM_CAPTURE_THRESH
         self.folder = Path("models/" + self.name)
         self.min_folder = Path(str(self.folder) + "/" + str(self.version) + "/local min")
+        self.cur_ts = datetime.datetime.now()
 
     def set_hps(self, hyperparams):
         self.hp = hyperparams
@@ -385,9 +389,11 @@ class Handler:
         if not os.path.exists(self.min_folder):
             os.makedirs(self.min_folder)
         epoch = 0
+        self.cur_ts = datetime.datetime.now()
         print("Starting Training")
         while epoch < self.hp.EPOCHS and self.training:
             epoch += 1
+            print(epoch)
             steps, reward = self.the_environment.run(self.agent, board_style)
             stats.collect('steps', steps)
             stats.collect('rewards', reward)
@@ -428,6 +434,11 @@ class Handler:
         self.agent.brain.model.save(my_file)
         self.agent.brain.model_.save(my_file_2)
         np.save(folder + "/" + str(i) + "/stats", np.array(stats.big_steps))
+        with open(folder + "/" + str(i) + "/summary.txt", "w") as sum:
+            print(f"model: {self.agent.brain.model.to_json()}", file=sum)
+            end = datetime.datetime.now()
+            print(f"start: {self.cur_ts}, stop: {end}", file=sum)
+            print(f"ran: {(end - self.cur_ts)}", file=sum)
         with open(folder + "/" + str(i) + "/hp.txt", 'w') as outfile:
             json.dump(self.hp.__dict__, outfile)
 

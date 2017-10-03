@@ -1,7 +1,7 @@
 from PyQt5.QtCore import QPointF
 from PyQt5.QtGui import QPolygonF, QColor
 import numpy as np
-import ricochet.helper as hlp
+import helper as hlp
 
 
 def circle(qp, x, y, size, offset=6):
