@@ -67,11 +67,10 @@ class HyperParameters(QWidget):
                 try:
                     setattr(self.hp, str(attr), int(self.name_inpt_dict[str(attr)].text()))
                 except:
-                    pass
-                try:
-                    setattr(self.hp, str(attr), float(self.name_inpt_dict[str(attr)].text()))
-                except:
-                    pass
+                    try:
+                        setattr(self.hp, str(attr), float(self.name_inpt_dict[str(attr)].text()))
+                    except:
+                        pass
         self.gui_play.new_handler_and_start(self.hp)
 
 
