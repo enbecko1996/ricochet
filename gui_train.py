@@ -6,6 +6,7 @@ from PyQt5.QtWidgets import (QWidget, QApplication, QDesktopWidget, QVBoxLayout,
                              QPushButton, QLabel)
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from qtpy.QtGui import QIcon
+import numpy as np
 
 
 class Status(QWidget):
@@ -14,6 +15,8 @@ class Status(QWidget):
         self.brain_handler = brain_handler
         self.epochs = []
         self.steps = []
+        self.poly_x = [0, 1]
+        self.poly_y = [0, 0]
         self.initUI()
 
     def initUI(self):
@@ -52,7 +55,8 @@ class Status(QWidget):
     def plot(self):
         ax = self.figure.add_subplot(111)
         ax.clear()
-        ax.plot(self.epochs, self.steps, '*-')
+        ax.plot(self.epochs, self.steps, '*-', color='green')
+        ax.plot(self.poly_x, self.poly_y, '*-', color='red')
         ax.set_xlabel('epoch')
         ax.set_ylabel('avg. steps')
         self.canvas.draw()
@@ -60,6 +64,12 @@ class Status(QWidget):
     def add_data_point(self, epoch, steps):
         self.epochs.append(epoch)
         self.steps.append(steps)
+        m, b = np.polyfit(self.epochs, self.steps, 1)
+        if len(self.epochs) == 1:
+            self.poly_x[0] = np.min(self.epochs)
+        self.poly_x[1] = np.max(self.epochs)
+        self.poly_y[0] = b
+        self.poly_y[1] = m * self.poly_x[1] + b
 
     @pyqtSlot()
     def pause_click(self):

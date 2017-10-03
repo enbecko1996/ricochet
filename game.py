@@ -69,6 +69,7 @@ class Environment:
         self.observation_space = self.the_state.shape
         self.flattened_input_size = self.grid_size**2 * (4 + num_figures + num_figures)
         self.action_size = action_size
+        self.dims = 4 + num_figures + num_figures
         self.cur_goal_name = None
         self.cur_goal = None
         self.cur_goal_pos = None

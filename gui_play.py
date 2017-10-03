@@ -4,7 +4,7 @@ import numpy as np
 from PyQt5.QtCore import QSize, Qt, pyqtSlot
 from PyQt5.QtGui import QPainter, QColor
 from PyQt5.QtWidgets import (QWidget, QApplication, QDesktopWidget, QVBoxLayout, QHBoxLayout,
-                             QLineEdit, QPushButton, QLabel, QGridLayout)
+                             QLineEdit, QPushButton, QLabel, QGridLayout, QCheckBox)
 from qtpy.QtGui import QIcon
 
 import game as game
@@ -180,6 +180,7 @@ import the_brain as brain
 from pathlib import Path
 import tensorflow as tf
 import gui_hps as gui_hps
+from threading import Thread
 
 
 class RicochetGui(QWidget):
@@ -221,10 +222,14 @@ class RicochetGui(QWidget):
 
         self.newest = QPushButton("newest", self)
         self.newest.clicked.connect(self.load_newest_click)
+
         self.version_lab = QLabel("version: ", self)
         self.version = QLineEdit(self)
+
         self.version_push = QPushButton("load", self)
         self.version_push.clicked.connect(self.load_vers_click)
+
+        self.conv = QCheckBox('conv', self)
 
         h_vers = QHBoxLayout()
         h_vers.addWidget(self.version_lab)
@@ -245,6 +250,8 @@ class RicochetGui(QWidget):
 
         grid.addWidget(self.board_lab, 4, 0)
         grid.addWidget(self.board_style, 4, 1)
+
+        grid.addWidget(self.conv, 5, 1)
 
         self.train = QPushButton('train', self)
         self.train.clicked.connect(self.train_click)
@@ -298,6 +305,22 @@ class RicochetGui(QWidget):
         self.hp_tweak = gui_hps.HyperParameters(self)
         self.hp_tweak.show()
 
+    def new_handler_and_start(self, hps):
+        print("hh1")
+        self.error.clear()
+        if self.brain_handler is None:
+            print("hh4")
+            self.brain_handler = brain.Handler(self.name.text(), 0, conv=self.conv.isChecked(), hyperparams=hps)
+            print("hh5")
+            self.brain_handler.make_status_gui()
+        else:
+            self.brain_handler.set_hps(hps)
+            self.brain_handler.make_status_gui()
+        print("hh2")
+        thread = Thread(target=self.start_train)
+        thread.start()
+        print("hh3")
+
     def start_train(self):
         style = self.board_style.text()
         if style == 'same':
@@ -338,7 +361,8 @@ class RicochetGui(QWidget):
                     my_file = Path(folder + "/0/worker.h5")
                     my_file_2 = Path(folder + "/0/feeder.h5")
                 self.name.setText(name)
-                self.brain_handler = brain.Handler(name, i, worker=my_file, feeder=my_file_2)
+                self.brain_handler = brain.Handler(name, i, conv=self.conv.isChecked(),
+                                                   worker=my_file, feeder=my_file_2)
                 self.graph = tf.get_default_graph()
                 return
         self.error.setText("failed to load: " + name)
@@ -354,7 +378,7 @@ class RicochetGui(QWidget):
             my_file = Path(folder + "/" + vers + "/worker.h5")
             my_file_2 = Path(folder + "/" + vers + "/feeder.h5")
             if my_file.is_file() and my_file_2.is_file():
-                self.brain_handler = brain.Handler(name, vers, worker=my_file, feeder=my_file_2)
+                self.brain_handler = brain.Handler(name, vers, conv=self.conv.isChecked(),  worker=my_file, feeder=my_file_2)
                 self.graph = tf.get_default_graph()
                 self.name.setText(name)
                 return

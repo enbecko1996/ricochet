@@ -52,7 +52,7 @@ class stats_collector():
 
 class debugger():
     render = False
-    log_epoch = 30
+    log_epoch = 2
 
     def reset(self):
         pass
@@ -85,7 +85,7 @@ from keras.optimizers import *
 
 
 class Brain:
-    def __init__(self, handler, conv=False, stateCnt=0, actionCnt=0, grid_size=0, dims=0, worker=None, feeder=None):
+    def __init__(self, handler, conv, stateCnt=0, actionCnt=0, grid_size=0, dims=0, worker=None, feeder=None):
         self.handler = handler
         self.conv = conv
         self.stateCnt = stateCnt
@@ -159,7 +159,7 @@ class Memory:  # stored as ( s, a, r, s_ )
 
 # -------------------- AGENT ---------------------------
 class Agent:
-    def __init__(self, handler, conv=False, state_count=0, action_count=0, grid_size=0, dims=0, worker=None, feeder=None):
+    def __init__(self, handler, conv, state_count=0, action_count=0, grid_size=0, dims=0, worker=None, feeder=None):
         self.handler = handler
         self.steps = 0
         self.epsilon = self.handler.hp.MAX_EPSILON
@@ -265,8 +265,9 @@ import game as the_game
 
 
 class Environment:
-    def __init__(self, problem=None):
+    def __init__(self, conv, problem=None):
         self.samples = []
+        self.conv = conv
         if isinstance(problem, the_game.Environment):
             self.my_env = problem
         else:
@@ -274,8 +275,20 @@ class Environment:
             # self.problem = problem
             # self.my_env = gym.make(problem)
 
+    def get_action_cnt(self):
+        return self.my_env.action_size
+
+    def get_state_cnt(self):
+        return self.my_env.flattened_input_size
+
+    def get_grid_size(self):
+        return self.my_env.grid_size
+
+    def get_dims(self):
+        return self.my_env.dims
+
     def run(self, current_agent, board_style):
-        s = self.my_env.reset(flattened=False, figure_style='random', board_style=board_style)
+        s = self.my_env.reset(flattened=not self.conv, figure_style='random', board_style=board_style)
         total_reward = 0
 
         steps = 0
@@ -285,7 +298,7 @@ class Environment:
             steps += 1
             a = current_agent.act(s)
 
-            s_, r, done, info = self.my_env.step(a, flattened=False)
+            s_, r, done, info = self.my_env.step(a, flattened=not self.conv)
 
             if done:  # terminal state
                 s_ = None
@@ -303,7 +316,7 @@ class Environment:
         return steps, total_reward
 
     def play_game(self, current_agent, board_style):
-        s = self.my_env.reset(flattened=False, figure_style='random', board_style=board_style)
+        s = self.my_env.reset(flattened=not self.conv, figure_style='random', board_style=board_style)
         total_reward = 0
         steps = 0
         while steps < 500:
@@ -319,7 +332,7 @@ class Environment:
             """print("max = {}, {}, taken = {}, {}".format(numpy.argmax(prediction),
                                                         the_game.print_action(numpy.argmax(prediction)), a,
                                                         the_game.print_action(a)))"""
-            s_, r, done, info = self.my_env.step(a, flattened=False)
+            s_, r, done, info = self.my_env.step(a, flattened=not self.conv)
             if done:  # terminal state
                 s_ = None
             s = s_
@@ -343,20 +356,19 @@ brd_stl = [[2, 0], [3, 1], [6, 0], [0, 1]]
 
 
 class Handler:
-    def __init__(self, name, version, worker=None, feeder=None, hyperparams=None):
+    def __init__(self, name, version, conv, worker=None, feeder=None, hyperparams=None):
         hlp.to_wrkdir()
         self.gui = None
         self.hp = hyperparameter.hyperparams()
         if hyperparams is not None:
             self.hp = hyperparams
-        self.the_environment = Environment(the_game.Environment(16, self.hp))
+        self.the_environment = Environment(conv, the_game.Environment(16, self.hp))
+        self.conv = conv
         self.training = False
         self.finished = False
         self.save = True
         self.name = name
         self.version = version
-        self.stateCnt = self.the_environment.my_env.flattened_input_size
-        self.actionCnt = self.the_environment.my_env.action_size
         self.agent = None
         self.randomAgent = None
         self.worker = worker
@@ -370,10 +382,11 @@ class Handler:
         self.hp = hyperparams
 
     def initialize(self, board_style):
-        self.agent = Agent(self, conv=True, action_count=self.actionCnt, state_count=self.stateCnt,
-                           grid_size=16, dims=4 + 2 * the_game.num_figures,
+        self.agent = Agent(self, conv=self.conv, action_count=self.the_environment.get_action_cnt(),
+                           state_count=self.the_environment.get_state_cnt(),
+                           grid_size=self.the_environment.get_grid_size(), dims=self.the_environment.get_dims(),
                            worker=self.worker, feeder=self.feeder)
-        self.randomAgent = RandomAgent(self, self.actionCnt)
+        self.randomAgent = RandomAgent(self, self.the_environment.get_action_cnt())
 
         print("performing Random Agent")
         while not self.randomAgent.memory.isFull():

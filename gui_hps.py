@@ -62,12 +62,6 @@ class HyperParameters(QWidget):
 
     @pyqtSlot()
     def train_click(self):
-        self.gui_play.error.clear()
-        if self.gui_play.brain_handler is None:
-            self.gui_play.brain_handler = brain.Handler(self.gui_play.name.text(), 0)
-            self.gui_play.brain_handler.make_status_gui()
-        else:
-            self.gui_play.brain_handler.make_status_gui()
         for attr in dir(self.hp):
             if not callable(getattr(self.hp, attr)) and not attr.startswith("__"):
                 try:
@@ -78,9 +72,7 @@ class HyperParameters(QWidget):
                     setattr(self.hp, str(attr), float(self.name_inpt_dict[str(attr)]))
                 except:
                     pass
-        self.gui_play.brain_handler.set_hps(self.hp)
-        thread = Thread(target=self.gui_play.start_train)
-        thread.start()
+        self.gui_play.new_handler_and_start(self.hp)
 
 
 if __name__ == '__main__':
