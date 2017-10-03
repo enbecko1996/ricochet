@@ -100,7 +100,7 @@ class Picker(QWidget):
 class Board(QWidget):
     def __init__(self, parent=None):
         QWidget.__init__(self, parent)
-        self.env = Environment(16)
+        self.env = Environment(8)
         self.clear()
         self.initUI()
 
@@ -113,14 +113,15 @@ class Board(QWidget):
         self.pick.hide()
 
     def clear(self):
-        self.env.reset(figure_style='none', board_style=[[2, 0], [3, 1], [6, 0], [0, 1]])
+        self.env.reset(figure_style='none')
+        self.env.add_surrounding()
         """self.env.set_quadrant(1, "quadrants/pre_0_1.npy")
         self.env.set_quadrant(2, "quadrants/pre_7_1.npy")
         self.env.set_quadrant(3, "quadrants/pre_3_0.npy")
         self.env.set_quadrant(4, "quadrants/pre_2_1.npy")"""
 
     def save(self, file_name):
-        self.env.save_current_as_quadrant(file_name)
+        self.env.save_current_game(file_name)
 
     def sizeHint(self):
         par_size = self.parentWidget().size()

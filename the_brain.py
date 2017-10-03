@@ -51,7 +51,7 @@ class stats_collector():
 
 class debugger():
     render = False
-    log_epoch = 2
+    log_epoch = 30
 
     def reset(self):
         pass
@@ -111,8 +111,8 @@ class Brain:
             model.add(Dense(units=80, activation='relu'))
             model.add(Dense(units=self.actionCnt, activation='linear'))
         else:
-            model.add(Dense(units=150, activation='relu', input_dim=self.stateCnt))
-            model.add(Dense(units=200, activation='relu'))
+            model.add(Dense(units=int(self.stateCnt * (2./3) + self.actionCnt), activation='relu', input_dim=self.stateCnt))
+            # model.add(Dense(units=200, activation='relu'))
             model.add(Dense(units=self.actionCnt, activation='linear'))
 
         opt = RMSprop(lr=self.handler.hp.LEARNING_RATE)
@@ -261,6 +261,7 @@ class RandomAgent:
 
 # -------------------- ENVIRONMENT ---------------------
 import game as the_game
+import gym
 
 
 class Environment:
@@ -270,9 +271,8 @@ class Environment:
         if isinstance(problem, the_game.Environment):
             self.my_env = problem
         else:
-            pass
-            # self.problem = problem
-            # self.my_env = gym.make(problem)
+            self.problem = problem
+            self.my_env = gym.make(problem)
 
     def get_action_cnt(self):
         return self.my_env.action_size
@@ -388,6 +388,7 @@ class Handler:
         self.randomAgent = RandomAgent(self, self.the_environment.get_action_cnt())
 
         print("performing Random Agent")
+        self.agent.brain.model.summary()
         while not self.randomAgent.memory.isFull():
             self.the_environment.run(self.randomAgent, board_style)
 

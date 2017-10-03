@@ -84,18 +84,20 @@ class Environment:
             self.hp = hyperparams
         pass
 
-    def reset(self, flattened=True, figure_style='same', board_style='random'):
+    def reset(self, flattened=True, figure_style='same', board_style='none'):
         self.the_state = np.zeros((self.grid_size, self.grid_size, 4 + num_figures + 1), dtype=np.int)
         self.reduced_state = np.zeros((self.grid_size, self.grid_size, 4 + num_figures + num_figures), dtype=np.int)
         self.figs_on_board.clear()
         self.goals_on_board.clear()
-        if isinstance(board_style, str) and board_style == 'random':
-            self.set_random_board()
+        if isinstance(board_style, str):
+            if board_style == 'random':
+                self.set_random_board()
         elif board_style is not None:
             for i in range(4):
                 self.set_quadrant(i + 1, all_quadrants[board_style[i][0]][board_style[i][1]])
         self.set_figures(figure_style)
-        self.set_current_goal('green_square')
+        if len(self.goals_on_board) > 0:
+            self.set_current_goal('green_square')
         """if len(self.goals_on_board) > 0:
             self.set_current_goal(goals[self.goals_on_board[rand.randrange(0, len(self.goals_on_board))]])"""
         self.cleanup()
@@ -132,30 +134,38 @@ class Environment:
                 for y in range(0, half_g):
                     if self.the_state[half_g][y][2] == 1:
                         self.the_state[half_g - 1][y][0] = 1
+                        self.reduced_state[half_g - 1][y][0] = 1
                 for x in range(half_g, self.grid_size):
                     if self.the_state[x][half_g - 1][1] == 1:
                         self.the_state[x][half_g][3] = 1
+                        self.reduced_state[x][half_g][3] = 1
             elif quad == 2:
                 for y in range(half_g, self.grid_size):
                     if self.the_state[half_g][y][2] == 1:
                         self.the_state[half_g - 1][y][0] = 1
+                        self.reduced_state[half_g - 1][y][0] = 1
                 for x in range(half_g, self.grid_size):
                     if self.the_state[x][half_g][3] == 1:
                         self.the_state[x][half_g - 1][1] = 1
+                        self.reduced_state[x][half_g - 1][1] = 1
             elif quad == 3:
                 for y in range(half_g, self.grid_size):
                     if self.the_state[half_g - 1][y][0] == 1:
                         self.the_state[half_g][y][2] = 1
+                        self.reduced_state[half_g][y][2] = 1
                 for x in range(0, half_g):
                     if self.the_state[x][half_g][3] == 1:
                         self.the_state[x][half_g - 1][1] = 1
+                        self.reduced_state[x][half_g - 1][1] = 1
             elif quad == 4:
                 for y in range(0, half_g):
                     if self.the_state[half_g - 1][y][0] == 1:
                         self.the_state[half_g][y][2] = 1
+                        self.reduced_state[half_g][y][2] = 1
                 for x in range(0, half_g):
                     if self.the_state[x][half_g - 1][1] == 1:
                         self.the_state[x][half_g][3] = 1
+                        self.reduced_state[x][half_g][3] = 1
 
     def set_quadrant(self, quad, quad_state):
         if 1 <= quad <= 4:
@@ -166,24 +176,28 @@ class Environment:
                 for x in range(half_g, self.grid_size):
                     for y in range(0, half_g):
                         self.the_state[x][y] = quad_state[0][x - half_g][y]
+                        self.reduced_state[x][y][:4 + num_figures] = quad_state[0][x - half_g][y][:4 + num_figures]
                         if self.the_state[x][y][4 + num_figures] > 0:
                             self.goals_on_board.append(self.the_state[x][y][4 + num_figures])
             elif quad == 2:
                 for x in range(half_g, self.grid_size):
                     for y in range(half_g, self.grid_size):
                         self.the_state[x][y] = quad_state[1][x - half_g][y - half_g]
+                        self.reduced_state[x][y][:4 + num_figures] = quad_state[1][x - half_g][y - half_g][:4 + num_figures]
                         if self.the_state[x][y][4 + num_figures] > 0:
                             self.goals_on_board.append(self.the_state[x][y][4 + num_figures])
             elif quad == 3:
                 for x in range(0, half_g):
                     for y in range(half_g, self.grid_size):
                         self.the_state[x][y] = quad_state[2][x - half_g][y - half_g]
+                        self.reduced_state[x][y][:4 + num_figures] = quad_state[2][x - half_g][y - half_g][:4 + num_figures]
                         if self.the_state[x][y][4 + num_figures] > 0:
                             self.goals_on_board.append(self.the_state[x][y][4 + num_figures])
             elif quad == 4:
                 for x in range(0, half_g):
                     for y in range(0, half_g):
                         self.the_state[x][y] = quad_state[3][x - half_g][y]
+                        self.reduced_state[x][y][:4 + num_figures] = quad_state[3][x - half_g][y][:4 + num_figures]
                         if self.the_state[x][y][4 + num_figures] > 0:
                             self.goals_on_board.append(self.the_state[x][y][4 + num_figures])
 
