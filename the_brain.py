@@ -16,7 +16,6 @@ from collections import deque
 # import gym
 import matplotlib.pyplot as plt
 import numpy
-import tensorflow as tf
 
 import hyperparameter as hyperparameter
 
@@ -345,7 +344,7 @@ class Environment:
 # -------------------- MAIN ----------------------------
 import helper as hlp
 from pathlib import Path
-import gui_train as status_gui
+from gui import gui_train as status_gui
 
 import numpy as np
 import os

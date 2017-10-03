@@ -1,8 +1,10 @@
-import numpy as np
-import hyperparameter as hp
 import random as rand
-import game_items_drawer as g
+
+import numpy as np
+
 import helper as hlp
+import hyperparameter as hp
+from gui import game_items_drawer as g
 
 grid_size = 4
 figures = ['red', 'green', 'blue', 'yellow', 'grey']

@@ -8,7 +8,6 @@ from PyQt5.QtWidgets import (QWidget, QApplication, QDesktopWidget, QVBoxLayout,
 from qtpy.QtGui import QIcon
 
 import game as game
-import game_items_drawer as drawer
 from game import Environment
 
 
@@ -179,7 +178,7 @@ class Board(QWidget):
 import the_brain as brain
 from pathlib import Path
 import tensorflow as tf
-import gui_hps as gui_hps
+from gui import gui_hps as gui_hps, game_items_drawer as drawer
 from threading import Thread
 
 
@@ -394,9 +393,8 @@ class RicochetGui(QWidget):
         self.move(qr.topLeft())
 
 
-if __name__ == '__main__':
+def play():
     import os
-
     print(os.getcwd())
     app = QApplication(sys.argv)
     gui = RicochetGui()
