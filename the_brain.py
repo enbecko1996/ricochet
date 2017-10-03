@@ -112,7 +112,7 @@ class Brain:
             model.add(Dense(units=80, activation='relu'))
             model.add(Dense(units=self.actionCnt, activation='linear'))
         else:
-            model.add(Dense(units=100, activation='relu', input_dim=self.stateCnt))
+            model.add(Dense(units=150, activation='relu', input_dim=self.stateCnt))
             model.add(Dense(units=200, activation='relu'))
             model.add(Dense(units=self.actionCnt, activation='linear'))
 

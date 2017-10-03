@@ -65,11 +65,11 @@ class HyperParameters(QWidget):
         for attr in dir(self.hp):
             if not callable(getattr(self.hp, attr)) and not attr.startswith("__"):
                 try:
-                    setattr(self.hp, str(attr), int(self.name_inpt_dict[str(attr)]))
+                    setattr(self.hp, str(attr), int(self.name_inpt_dict[str(attr)].text()))
                 except:
                     pass
                 try:
-                    setattr(self.hp, str(attr), float(self.name_inpt_dict[str(attr)]))
+                    setattr(self.hp, str(attr), float(self.name_inpt_dict[str(attr)].text()))
                 except:
                     pass
         self.gui_play.new_handler_and_start(self.hp)
