@@ -1,5 +1,5 @@
 from PyQt5.QtCore import QPointF
-from PyQt5.QtGui import QPolygonF, QColor
+from PyQt5.QtGui import QPolygonF, QColor, QPen
 import numpy as np
 import helper as hlp
 
@@ -60,4 +60,15 @@ def draw_goal(qp, pos, game, idx, per_box):
         qp.setPen(QColor(col[0] - 100, col[1] - 100, col[2] - 100))
         qp.setBrush(QColor(col[0], col[1], col[2]))
         game.goal_dict[idx][3](qp, pos[0] * per_box, pos[1] * per_box, per_box, offset=20)
+
+
+def cur_goal(qp, pos, per_box):
+    pen = QPen(QColor(255, 255, 80))
+    print("hh1")
+    pen.setWidth(8)
+    qp.setPen(pen)
+    qp.setBrush(QColor(0, 0, 0, 0))
+    print("hh2")
+    qp.drawRect(pos[0] * per_box + 3, pos[1] * per_box + 3, per_box - 3, per_box - 3)
+    print("hh3")
 

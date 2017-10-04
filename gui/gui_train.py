@@ -1,6 +1,7 @@
 import sys
 
 import matplotlib
+import matplotlib.pyplot as plt
 from PyQt5.QtCore import Qt, pyqtSlot
 from PyQt5.QtWidgets import (QWidget, QApplication, QDesktopWidget, QVBoxLayout, QHBoxLayout,
                              QPushButton, QLabel)
@@ -35,6 +36,7 @@ class Status(QWidget):
 
         self.figure = matplotlib.figure.Figure()
         self.canvas = FigureCanvas(self.figure)
+        self.ax = self.figure.add_subplot(111)
 
         v_main = QVBoxLayout()
 
@@ -53,12 +55,11 @@ class Status(QWidget):
         self.show()
 
     def plot(self):
-        ax = self.figure.add_subplot(111)
-        ax.clear()
-        ax.plot(self.epochs, self.steps, '*-', color='green')
-        ax.plot(self.poly_x, self.poly_y, '*-', color='red')
-        ax.set_xlabel('epoch')
-        ax.set_ylabel('avg. steps')
+        self.ax.clear()
+        self.ax.plot(self.epochs, self.steps, '*-', color='green')
+        self.ax.plot(self.poly_x, self.poly_y, '*-', color='red')
+        self.ax.set_xlabel('epoch')
+        self.ax.set_ylabel('avg. steps')
         self.canvas.draw()
 
     def add_data_point(self, epoch, steps):
@@ -70,6 +71,9 @@ class Status(QWidget):
         self.poly_x[1] = np.max(self.epochs)
         self.poly_y[0] = b
         self.poly_y[1] = m * self.poly_x[1] + b
+
+    def save_plot_to_disk(self, path):
+        self.figure.savefig(path + ".png")
 
     @pyqtSlot()
     def pause_click(self):

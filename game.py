@@ -50,6 +50,10 @@ fig_dict = {0: ('red', red_goals, 'R', red), 1: ('green', green_goals, 'G', gree
 
 all_quadrants = np.load("quadrants/pre_all.npy")
 
+in_wall_reward = -2.0
+step_reward = -1.0
+goal_reached_reward = 80.0
+
 
 class Action:
     def __init__(self, fig, direc):
@@ -62,7 +66,7 @@ action_size = len(actions)
 
 
 class Environment:
-    def __init__(self, g_size, hyperparams=None):
+    def __init__(self, g_size, board_style='none'):
         self.the_state = np.zeros((g_size, g_size, 4 + num_figures + 1), dtype=np.int)
         self.reduced_state = np.zeros((g_size, g_size, 4 + num_figures + num_figures), dtype=np.int)
         self.grid_size = g_size
@@ -78,33 +82,41 @@ class Environment:
         self.cur_goal_color = None
         self.figs_on_board = []
         self.goals_on_board = []
-        if hyperparams is None:
-            self.hp = hp.hyperparams()
-        else:
-            self.hp = hyperparams
-        pass
+        self.apply_board_style(board_style)
 
-    def reset(self, flattened=True, figure_style='same', board_style='none'):
+    def reset(self, flattened=True, figure_style='same', board_style='none', goal_style='random'):
         self.the_state = np.zeros((self.grid_size, self.grid_size, 4 + num_figures + 1), dtype=np.int)
         self.reduced_state = np.zeros((self.grid_size, self.grid_size, 4 + num_figures + num_figures), dtype=np.int)
         self.figs_on_board.clear()
         self.goals_on_board.clear()
+        self.apply_board_style(board_style)
+        self.set_figures(figure_style)
+        if isinstance(goal_style, str):
+            if goal_style == 'random':
+                if len(self.goals_on_board) > 0:
+                    self.set_current_goal(goals[self.goals_on_board[rand.randrange(0, len(self.goals_on_board))]])
+        else:
+            if len(self.goals_on_board) > 0:
+                self.set_current_goal('green_square')
+        # self.render()
+
+        if flattened:
+            return self.get_flattened_reduced_state()
+        else:
+            return np.array(self.reduced_state)
+
+    def set_state(self, other_env):
+        self.the_state = np.array(other_env.the_state)
+        self.reduced_state = np.array(other_env.reduced_state)
+
+    def apply_board_style(self, board_style):
         if isinstance(board_style, str):
             if board_style == 'random':
                 self.set_random_board()
         elif board_style is not None:
             for i in range(4):
                 self.set_quadrant(i + 1, all_quadrants[board_style[i][0]][board_style[i][1]])
-        self.set_figures(figure_style)
-        if len(self.goals_on_board) > 0:
-            self.set_current_goal('green_square')
-        """if len(self.goals_on_board) > 0:
-            self.set_current_goal(goals[self.goals_on_board[rand.randrange(0, len(self.goals_on_board))]])"""
         self.cleanup()
-        if flattened:
-            return self.get_flattened_reduced_state()
-        else:
-            return np.array(self.reduced_state)
 
     def set_random_board(self):
         taken = list(range(len(all_quadrants)))
@@ -216,7 +228,17 @@ class Environment:
                     poss.append((x, y))
                     self.add_single_figure([x, y], i)
 
+    def get_current_goal_pos(self):
+        for x in range(self.grid_size):
+            for y in range(self.grid_size):
+                gol = self.reduced_state[x][y][4 + num_figures: 4 + 2 * num_figures]
+                gol = hlp.one_hot_to_id(gol)
+                if gol > -1:
+                    return x, y
+
     def set_current_goal(self, gol):
+        if self.cur_goal_pos is not None:
+            self.reduced_state[self.cur_goal_pos[0]][self.cur_goal_pos[1]][4 + num_figures:4 + 2 * num_figures] = 0
         if isinstance(gol, str):
             self.cur_goal_name = gol
             self.cur_goal = goals.index(self.cur_goal_name)
@@ -230,10 +252,27 @@ class Environment:
                 hlp.as_one_hot(self.cur_goal_color, num_figures)
         else:
             self.reduced_state[self.cur_goal_pos[0]][self.cur_goal_pos[1]][4 + num_figures:4 + 2 * num_figures] = 1
-            # print(self.the_state, self.reduced_state)
 
     def get_flattened_reduced_state(self):
         return np.array(np.reshape(self.reduced_state, (self.flattened_input_size,)))
+
+    def get_reduced_state(self):
+        return np.array(self.reduced_state)
+
+    def clear_pos(self, x, y):
+        fig = hlp.one_hot_to_id(self.the_state[x][y][4:4 + num_figures])
+        gol = self.the_state[x][y][4 + num_figures]
+        if fig in self.figs_on_board:
+            self.figs_on_board.remove(fig)
+        if gol in self.goals_on_board:
+            self.goals_on_board.remove(gol)
+        self.the_state[x][y][4:] = 0
+
+    def get_goal_at(self, x, y):
+        idx = self.the_state[x][y][4 + num_figures]
+        if idx > 0:
+            return goal_dict[idx][0]
+        return None
 
     def get_pos_on_board(self, state, test):
         if test is not None:
@@ -286,7 +325,7 @@ class Environment:
                     # print(fig_dict[fig][0], dir_dict[direc])
                     new_x, new_y = self.iterate_step(self.the_state, x, y, direc)
                     if new_x == x and new_y == y:
-                        return self.hp.in_wall_reward, False
+                        return in_wall_reward, False
                     else:
                         self.the_state[x][y][4 + fig] = 0
                         self.the_state[new_x][new_y][4 + fig] = 1
@@ -295,10 +334,10 @@ class Environment:
                         if self.cur_goal is not None \
                                 and self.the_state[new_x][new_y][4 + self.num_figures] == self.cur_goal \
                                 and self.cur_goal_name in fig_dict[fig][1]:
-                            return self.hp.goal_reached_reward, True
+                            return goal_reached_reward, True
                         else:
-                            return self.hp.step_reward, False
-        return self.hp.in_wall_reward, True
+                            return step_reward, False
+        return in_wall_reward, True
 
     def iterate_step(self, state, x, y, direc, steps=None):
         if steps is not None:

@@ -1,10 +1,5 @@
 class hyperparams:
     def __init__(self):
-        # environment
-        self.goal_reached_reward = 16.
-        self.step_reward = -1.
-        self.in_wall_reward = -5.
-
         # neural_net
         self.MAX_STEPS = 300
         self.EPOCHS = 75000

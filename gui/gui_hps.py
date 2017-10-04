@@ -1,14 +1,11 @@
 import sys
 
-import matplotlib
-from PyQt5.QtCore import Qt, pyqtSlot
+from PyQt5.QtCore import pyqtSlot
 from PyQt5.QtWidgets import (QWidget, QApplication, QDesktopWidget, QVBoxLayout, QHBoxLayout,
                              QPushButton, QLabel, QLineEdit)
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from qtpy.QtGui import QIcon
+
 import hyperparameter as hp
-from threading import Thread
-import the_brain as brain
 
 
 class HyperParameters(QWidget):

@@ -1,5 +1,6 @@
 import sys
 
+import net.net_handler as net_handler
 import numpy as np
 from PyQt5.QtCore import QSize, Qt, pyqtSlot
 from PyQt5.QtGui import QPainter, QColor
@@ -9,6 +10,11 @@ from qtpy.QtGui import QIcon
 
 import game as game
 from game import Environment
+from gui import gui_hps as gui_hps, game_items_drawer as drawer
+import os
+
+allowed_board_styles = ['same', 'random']
+same_board_style = [[0, 0], [1, 1], [2, 0], [3, 1]]
 
 
 class Picker(QWidget):
@@ -100,7 +106,7 @@ class Picker(QWidget):
 class Board(QWidget):
     def __init__(self, parent=None):
         QWidget.__init__(self, parent)
-        self.env = Environment(8)
+        self.env = Environment(16, board_style=same_board_style)
         self.clear()
         self.initUI()
 
@@ -113,8 +119,7 @@ class Board(QWidget):
         self.pick.hide()
 
     def clear(self):
-        self.env.reset(figure_style='none')
-        self.env.add_surrounding()
+        # self.env.reset(figure_style='none', board_style=same_board_style)
         """self.env.set_quadrant(1, "quadrants/pre_0_1.npy")
         self.env.set_quadrant(2, "quadrants/pre_7_1.npy")
         self.env.set_quadrant(3, "quadrants/pre_3_0.npy")
@@ -155,7 +160,15 @@ class Board(QWidget):
             self.env.change_wall(([x, y], [x, y + 1]))
         self.pick.hide()
         if thick < diffX < per_box - thick and thick < diffY < per_box - thick:
-            self.pick.open((mouseX, mouseY), [x, y], self.env)
+            if event.button() == Qt.LeftButton:
+                self.pick.open((mouseX, mouseY), [x, y], self.env)
+            elif event.button() == Qt.RightButton:
+                goal_here = self.env.get_goal_at(x, y)
+                if goal_here is not None:
+                    self.env.set_current_goal(goal_here)
+            elif event.button() == Qt.MiddleButton:
+                self.env.clear_pos(x, y)
+
         self.update()
 
     def drawWidget(self, qp):
@@ -174,13 +187,16 @@ class Board(QWidget):
                 drawer.drawWall(qp, (x, y), self.env.the_state[x][y][:4], per_box)
                 drawer.draw_fig(qp, (x, y), game, self.env.the_state[x][y][4:4 + game.num_figures], per_box)
                 drawer.draw_goal(qp, (x, y), game, self.env.the_state[x][y][4 + game.num_figures], per_box)
+                if self.env.cur_goal_pos is not None and x == self.env.cur_goal_pos[0] and y == self.env.cur_goal_pos[1]:
+                    print("draw goal")
+                    drawer.cur_goal(qp, (x, y), per_box)
 
 # --------------------------MAIN-----------------------------------------
-import the_brain as brain
 from pathlib import Path
 import tensorflow as tf
-from gui import gui_hps as gui_hps, game_items_drawer as drawer
 from threading import Thread
+from os import listdir
+from os.path import isfile, join
 
 
 class RicochetGui(QWidget):
@@ -195,6 +211,8 @@ class RicochetGui(QWidget):
         self.center()
         self.setWindowTitle('Icon')
         self.setWindowIcon(QIcon('test.png'))
+
+# -----------SAVING BOARD---------------------------
 
         self.board = Board(self)
         self.board.resize(self.board.sizeHint())
@@ -211,6 +229,14 @@ class RicochetGui(QWidget):
         self.clear.clicked.connect(self.clear_click)
         self.clear.resize(20, 50)
 
+        vbox = QVBoxLayout()
+        vbox.setAlignment(Qt.AlignTop)
+        vbox.addWidget(self.file_name)
+        vbox.addWidget(self.save)
+        vbox.addWidget(self.clear)
+
+# -----------LOADING MODELS, TRAINING---------------------------
+
         self.name_lab = QLabel("name: ", self)
         self.name = QLineEdit(self)
 
@@ -222,6 +248,9 @@ class RicochetGui(QWidget):
 
         self.newest = QPushButton("newest", self)
         self.newest.clicked.connect(self.load_newest_click)
+
+        self.best = QPushButton("best", self)
+        self.best.clicked.connect(self.load_best_click)
 
         self.version_lab = QLabel("version: ", self)
         self.version = QLineEdit(self)
@@ -236,13 +265,18 @@ class RicochetGui(QWidget):
         h_vers.addWidget(self.version)
         h_vers.addWidget(self.version_push)
 
+        h_bes_new = QHBoxLayout()
+        h_bes_new.addWidget(self.newest)
+        h_bes_new.addWidget(self.best)
+
+
         grid = QGridLayout()
         grid.setSpacing(10)
 
         grid.addWidget(self.load_lab, 1, 0)
         grid.addWidget(self.load_name, 1, 1)
 
-        grid.addWidget(self.newest, 2, 0)
+        grid.addLayout(h_bes_new, 2, 0)
         grid.addLayout(h_vers, 2, 1)
 
         grid.addWidget(self.name_lab, 3, 0)
@@ -264,21 +298,26 @@ class RicochetGui(QWidget):
         vbox_2.addWidget(self.train)
         vbox_2.addWidget(self.error)
 
-        vbox = QVBoxLayout()
-        vbox.setAlignment(Qt.AlignTop)
-        vbox.addWidget(self.file_name)
-        vbox.addWidget(self.save)
-        vbox.addWidget(self.clear)
+# ------------PLAYING AGAINST AI------------------
+
+        self.enemy = QLabel("no selected enemy ", self)
+
+        self.play_btn = QPushButton("play", self)
+        self.play_btn.clicked.connect(self.play_game)
 
         vbox_3 = QVBoxLayout()
+        vbox_3.addWidget(self.enemy)
+        vbox_3.addWidget(self.play_btn)
+
+# -----------LAYOUT---------------------------
 
         v_main = QVBoxLayout()
         v_main.setAlignment(Qt.AlignTop)
         v_main.addLayout(vbox_2)
         v_main.addStretch(1)
-        v_main.addLayout(vbox)
-        v_main.addStretch(1)
         v_main.addLayout(vbox_3)
+        v_main.addStretch(1)
+        v_main.addLayout(vbox)
 
         hbox = QHBoxLayout()
         hbox.setAlignment(Qt.AlignLeft)
@@ -287,6 +326,19 @@ class RicochetGui(QWidget):
         self.setLayout(hbox)
 
         self.show()
+
+    def set_current_enemy(self, enemy_name):
+        self.enemy.setText("current enemy: " + enemy_name)
+
+    @pyqtSlot()
+    def play_game(self):
+        self.error.clear()
+        if self.board.env.cur_goal_pos is not None and len(self.board.env.figs_on_board) == game.num_figures:
+            if self.brain_handler is not None:
+                steps, reward, actions = self.brain_handler.play_game(self.board.env)
+                print(len(actions), actions)
+                return
+        self.error.setText("no goal set, too less figures or brain_handler is None.")
 
     @pyqtSlot()
     def save_click(self):
@@ -302,40 +354,41 @@ class RicochetGui(QWidget):
 
     @pyqtSlot()
     def train_click(self):
-        self.hp_tweak = gui_hps.HyperParameters(self)
-        self.hp_tweak.show()
+        self.error.clear()
+        name = self.name.text()
+        path = "models/" + name
+        if self.board_style.text() in allowed_board_styles and (not os.path.isdir(path) or self.graph is not None):
+            self.hp_tweak = gui_hps.HyperParameters(self)
+            self.hp_tweak.show()
+        else:
+            self.error.setText("Can't create {}, because a model with that name already exists or wrong style.".format(name))
 
     def new_handler_and_start(self, hps):
-        print("hh1")
         self.error.clear()
         if self.brain_handler is None:
-            print("hh4")
-            self.brain_handler = brain.Handler(self.name.text(), 0, conv=self.conv.isChecked(), hyperparams=hps)
-            print("hh5")
+            self.brain_handler = net_handler.Handler(self.name.text(), 0, conv=self.conv.isChecked(), hyperparams=hps)
             self.brain_handler.make_status_gui()
         else:
             self.brain_handler.set_hps(hps)
             self.brain_handler.make_status_gui()
-        print("hh2")
         thread = Thread(target=self.start_train)
         thread.start()
-        print("hh3")
 
     def start_train(self):
         style = self.board_style.text()
         if style == 'same':
-            style = [[2, 0], [3, 1], [6, 0], [0, 1]]
+            style = same_board_style
         elif style == 'random':
             pass
         else:
             self.error.setText("specified style is invalid")
             return
+        print("heeeey")
         if self.graph is not None:
             with self.graph.as_default():
-                self.brain_handler.initialize(style)
                 self.brain_handler.start_training(style)
         else:
-            self.brain_handler.initialize(style)
+            self.brain_handler.initialize()
             self.brain_handler.start_training(style)
 
     @pyqtSlot()
@@ -361,9 +414,45 @@ class RicochetGui(QWidget):
                     my_file = Path(folder + "/0/worker.h5")
                     my_file_2 = Path(folder + "/0/feeder.h5")
                 self.name.setText(name)
-                self.brain_handler = brain.Handler(name, i, conv=self.conv.isChecked(),
-                                                   worker=my_file, feeder=my_file_2)
+                self.brain_handler = net_handler.Handler(name, i, conv=self.conv.isChecked(),
+                                                         worker=my_file, feeder=my_file_2)
+                self.brain_handler.initialize()
                 self.graph = tf.get_default_graph()
+                self.set_current_enemy(name)
+                return
+        self.error.setText("failed to load: " + name)
+
+    @pyqtSlot()
+    def load_best_click(self):
+        self.error.clear()
+        name = self.load_name.text()
+        folder = Path("models/" + name)
+        if folder.is_dir():
+            folder = str(folder)
+            cur_fold = folder + "/0/local min"
+            my_path = Path(cur_fold)
+            i = 0
+            min_score = sys.maxsize
+            min_files = ["", ""]
+            while my_path.is_dir():
+                onlyfiles = [f for f in listdir(cur_fold) if isfile(join(cur_fold, f))]
+                for f in onlyfiles:
+                    if f.startswith("worker_"):
+                        cur = f[7:-3]
+                        if float(cur) < min_score:
+                            min_files[0] = join(cur_fold, f)
+                            min_files[1] = join(cur_fold, f.replace("worker_", "feeder_"))
+                            min_score = float(cur)
+                i += 1
+                cur_fold = folder + "/" + str(i) + "/local min"
+                my_path = Path(cur_fold)
+            if len(min_files[0]) > 0 and len(min_files[1]) > 0:
+                self.name.setText(name)
+                self.brain_handler = net_handler.Handler(name, i, conv=self.conv.isChecked(),
+                                                         worker=min_files[0], feeder=min_files[1])
+                self.brain_handler.initialize()
+                self.graph = tf.get_default_graph()
+                self.set_current_enemy(name)
                 return
         self.error.setText("failed to load: " + name)
 
@@ -378,9 +467,11 @@ class RicochetGui(QWidget):
             my_file = Path(folder + "/" + vers + "/worker.h5")
             my_file_2 = Path(folder + "/" + vers + "/feeder.h5")
             if my_file.is_file() and my_file_2.is_file():
-                self.brain_handler = brain.Handler(name, vers, conv=self.conv.isChecked(),  worker=my_file, feeder=my_file_2)
+                self.brain_handler = net_handler.Handler(name, vers, conv=self.conv.isChecked(), worker=my_file, feeder=my_file_2)
+                self.brain_handler.initialize()
                 self.graph = tf.get_default_graph()
                 self.name.setText(name)
+                self.set_current_enemy(name)
                 return
         self.error.setText("failed to load: " + name + " with vers.: " + vers)
 
