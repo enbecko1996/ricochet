@@ -72,6 +72,7 @@ class HyperParameters(QWidget):
                     except:
                         pass
         self.gui_play.new_handler_and_start(self.hp)
+        self.hide()
 
 
 if __name__ == '__main__':

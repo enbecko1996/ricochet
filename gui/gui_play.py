@@ -355,8 +355,8 @@ class RicochetGui(QWidget):
                 my_file_2 = Path(folder + "/" + str(i) + "/feeder.h5")
             if i > 0:
                 if i > 1:
-                    my_file = Path(folder + "/" + str(i) + "/worker.h5")
-                    my_file_2 = Path(folder + "/" + str(i) + "/feeder.h5")
+                    my_file = Path(folder + "/" + str(i - 1) + "/worker.h5")
+                    my_file_2 = Path(folder + "/" + str(i - 1) + "/feeder.h5")
                 else:
                     my_file = Path(folder + "/0/worker.h5")
                     my_file_2 = Path(folder + "/0/feeder.h5")
