@@ -38,6 +38,7 @@ class Handler:
 
     def set_hps(self, hyperparams):
         self.hp = hyperparams
+        self.agent.update_learning_rate(self.hp.LEARNING_RATE)
 
     def initialize(self):
         self.agent = Agent(self, conv=self.conv, action_count=self.the_environment.get_action_cnt(),
@@ -65,7 +66,7 @@ class Handler:
         print("Starting Training")
         while epoch < self.hp.EPOCHS and self.training:
             epoch += 1
-            # print(epoch, end=' ', flush=True)
+            print(epoch, end=' ', flush=True)
             steps, reward = self.the_environment.run(self.agent, board_style)
             stats.collect('steps', steps)
             stats.collect('rewards', reward)
@@ -99,14 +100,14 @@ class Handler:
                 stats.steps.clear()
 
             if epoch % debug.snapshot == 0:
-                self.save_model()
+                self.save_model(epoch)
 
         if self.save:
-            self.save_model()
+            self.save_model(epoch)
         self.finished = True
         print("finished training")
 
-    def save_model(self):
+    def save_model(self, epochs_done):
         folder = str(self.folder)
         vers = str(self.version)
         my_file = Path(folder + "/" + vers + "/worker.h5")
@@ -119,7 +120,7 @@ class Handler:
             print(f"model: {self.agent.brain.model.to_json()}", file=sum)
             end = datetime.datetime.now()
             print(f"start: {self.cur_ts}, stop: {end}", file=sum)
-            print(f"ran: {(end - self.cur_ts)}", file=sum)
+            print(f"ran: {(end - self.cur_ts)} on {epochs_done} epochs.", file=sum)
         with open(folder + "/" + vers + "/hp.txt", 'w') as outfile:
             json.dump(self.hp.__dict__, outfile)
         self.gui.save_plot_to_disk(folder + "/" + vers + "/plot")

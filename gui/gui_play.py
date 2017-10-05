@@ -12,6 +12,7 @@ import game as game
 from game import Environment
 from gui import gui_hps as gui_hps, game_items_drawer as drawer
 import os
+import keras.backend as K
 
 allowed_board_styles = ['same', 'random']
 same_board_style = [[0, 0], [1, 1], [2, 0], [3, 1]]
@@ -399,6 +400,7 @@ class RicochetGui(QWidget):
         print("heeeey")
         if self.graph is not None:
             with self.graph.as_default():
+                self.brain_handler.initialize()
                 self.brain_handler.start_training(style)
         else:
             self.brain_handler.initialize()

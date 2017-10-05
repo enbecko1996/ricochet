@@ -49,8 +49,8 @@ class stats_collector():
 
 class debugger:
     render = False
-    log_epoch = 2
-    snapshot = 50
+    log_epoch = 30
+    snapshot = 300
 
     def reset(self):
         pass
@@ -114,6 +114,7 @@ class Brain:
             # model.add(Dense(units=200, activation='relu'))
             model.add(Dense(units=self.actionCnt, activation='linear'))
 
+        print(f"learning rate = {self.handler.hp.LEARNING_RATE}")
         opt = RMSprop(lr=self.handler.hp.LEARNING_RATE)
         model.compile(loss=huber_loss, optimizer=opt)
 
@@ -233,6 +234,12 @@ class Agent:
             the_environment.my_env.render(state=s_, flattened=True, reduced=True)"""
 
         self.brain.train(x, y)
+
+    def update_learning_rate(self, lr):
+        print(f"learning rate = {lr}")
+        opt = RMSprop(lr=lr)
+        self.brain.model.compile(loss=huber_loss, optimizer=opt)
+        self.brain.model_.compile(loss=huber_loss, optimizer=opt)
 
 
 class RandomAgent:
