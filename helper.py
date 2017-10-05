@@ -81,9 +81,9 @@ def to_wrkdir():
         pass
 
 """for i in range(8):
-    for j in range(2):
+    for j in range(0):
         states = load_state("quadrants/pre_"+str(i)+"_"+str(j)+".npy")
-        lis = [states[0], get_rotated_quadrant(2, states, 8), get_rotated_quadrant(3, states,  8), get_rotated_quadrant(4, states, 8)]
+        lis = [states[0], get_rotated_quadrant(0, states, 8), get_rotated_quadrant(3, states,  8), get_rotated_quadrant(4, states, 8)]
         np.save("quadrants/pre_"+str(i)+"_"+str(j)+"", np.array(lis))"""
 
 """for i in range(8):

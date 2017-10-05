@@ -45,12 +45,12 @@ class stats_collector():
         if self.diction[name][0]:
             plt.plot(self.diction[name][1])
             plt.show()
-
+#
 
 class debugger:
     render = False
-    log_epoch = 2
-    snapshot = 50
+    log_epoch = 30
+    snapshot = 300
 
     def reset(self):
         pass

@@ -121,7 +121,7 @@ class Board(QWidget):
     def clear(self):
         # self.env.reset(figure_style='none', board_style=same_board_style)
         """self.env.set_quadrant(1, "quadrants/pre_0_1.npy")
-        self.env.set_quadrant(2, "quadrants/pre_7_1.npy")
+        self.env.set_quadrant(0, "quadrants/pre_7_1.npy")
         self.env.set_quadrant(3, "quadrants/pre_3_0.npy")
         self.env.set_quadrant(4, "quadrants/pre_2_1.npy")"""
 
@@ -408,9 +408,9 @@ class RicochetGui(QWidget):
     def load_newest_click(self):
         self.reset_log()
         name = self.load_name.text()
-        folder = Path("models/" + name)
-        if folder.is_dir():
-            folder = str(folder)
+        folder = "models/" + name
+        print(folder, os.path.isdir(folder))
+        if os.path.isdir(folder):
             my_file = Path(folder + "/0/worker.h5")
             my_file_2 = Path(folder + "/0/feeder.h5")
             i = 0
@@ -426,15 +426,15 @@ class RicochetGui(QWidget):
                 else:
                     my_file = Path(folder + "/0/worker.h5")
                     my_file_2 = Path(folder + "/0/feeder.h5")
-                self.name.setText(name)
-                self.brain_handler = net_handler.Handler(name, i, conv=self.conv.isChecked(),
+            self.name.setText(name)
+            self.brain_handler = net_handler.Handler(name, i, conv=self.conv.isChecked(),
                                                          worker=my_file, feeder=my_file_2)
-                self.brain_handler.initialize()
-                self.graph = tf.get_default_graph()
-                self.set_current_enemy(name)
-                self.success.setText("successfully loaded {}".format(my_file))
-                return
-        self.error.setText("failed to load: " + name)
+            self.brain_handler.initialize()
+            self.graph = tf.get_default_graph()
+            self.set_current_enemy(name)
+            self.success.setText("successfully loaded {}".format(my_file))
+            return
+        self.error.setText("failed to load:", name)
 
     @pyqtSlot()
     def load_best_click(self):

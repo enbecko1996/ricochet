@@ -65,7 +65,7 @@ class Handler:
         print("Starting Training")
         while epoch < self.hp.EPOCHS and self.training:
             epoch += 1
-            # print(epoch, end=' ', flush=True)
+            print(epoch, end=' ', flush=True)
             steps, reward = self.the_environment.run(self.agent, board_style)
             stats.collect('steps', steps)
             stats.collect('rewards', reward)
