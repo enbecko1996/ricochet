@@ -6,7 +6,7 @@ from PyQt5.QtCore import QSize, Qt, pyqtSlot
 from PyQt5.QtGui import QPainter, QColor
 from PyQt5.QtWidgets import (QWidget, QApplication, QDesktopWidget, QVBoxLayout, QHBoxLayout,
                              QLineEdit, QPushButton, QLabel, QGridLayout, QCheckBox)
-from qtpy.QtGui import QIcon
+from qtpy.QtGui import QIcon, QPalette
 
 import game as game
 from game import Environment
@@ -269,7 +269,6 @@ class RicochetGui(QWidget):
         h_bes_new.addWidget(self.newest)
         h_bes_new.addWidget(self.best)
 
-
         grid = QGridLayout()
         grid.setSpacing(10)
 
@@ -291,12 +290,21 @@ class RicochetGui(QWidget):
         self.train.clicked.connect(self.train_click)
 
         self.error = QLabel('', self)
+        err_palette = QPalette()
+        err_palette.setColor(QPalette.WindowText, Qt.red)
+        self.error.setPalette(err_palette)
+
+        self.success = QLabel('', self)
+        succ_palette = QPalette()
+        succ_palette.setColor(QPalette.WindowText, Qt.green)
+        self.success.setPalette(succ_palette)
 
         vbox_2 = QVBoxLayout()
         vbox_2.setAlignment(Qt.AlignTop)
         vbox_2.addLayout(grid)
         vbox_2.addWidget(self.train)
         vbox_2.addWidget(self.error)
+        vbox_2.addWidget(self.success)
 
 # ------------PLAYING AGAINST AI------------------
 
@@ -330,9 +338,14 @@ class RicochetGui(QWidget):
     def set_current_enemy(self, enemy_name):
         self.enemy.setText("current enemy: " + enemy_name)
 
+    def reset_log(self):
+        self.error.clear()
+        self.success.clear()
+
+
     @pyqtSlot()
     def play_game(self):
-        self.error.clear()
+        self.reset_log()
         if self.board.env.cur_goal_pos is not None and len(self.board.env.figs_on_board) == game.num_figures:
             if self.brain_handler is not None:
                 steps, reward, actions = self.brain_handler.play_game(self.board.env)
@@ -342,19 +355,19 @@ class RicochetGui(QWidget):
 
     @pyqtSlot()
     def save_click(self):
-        self.error.clear()
+        self.reset_log()
         file_name = self.file_name.text()
         self.board.save(file_name)
 
     @pyqtSlot()
     def clear_click(self):
-        self.error.clear()
+        self.reset_log()
         self.board.clear()
         self.board.update()
 
     @pyqtSlot()
     def train_click(self):
-        self.error.clear()
+        self.reset_log()
         name = self.name.text()
         path = "models/" + name
         if self.board_style.text() in allowed_board_styles and (not os.path.isdir(path) or self.graph is not None):
@@ -364,7 +377,7 @@ class RicochetGui(QWidget):
             self.error.setText("Can't create {}, because a model with that name already exists or wrong style.".format(name))
 
     def new_handler_and_start(self, hps):
-        self.error.clear()
+        self.reset_log()
         if self.brain_handler is None:
             self.brain_handler = net_handler.Handler(self.name.text(), 0, conv=self.conv.isChecked(), hyperparams=hps)
             self.brain_handler.make_status_gui()
@@ -393,7 +406,7 @@ class RicochetGui(QWidget):
 
     @pyqtSlot()
     def load_newest_click(self):
-        self.error.clear()
+        self.reset_log()
         name = self.load_name.text()
         folder = Path("models/" + name)
         if folder.is_dir():
@@ -419,12 +432,13 @@ class RicochetGui(QWidget):
                 self.brain_handler.initialize()
                 self.graph = tf.get_default_graph()
                 self.set_current_enemy(name)
+                self.success.setText("successfully loaded {}".format(my_file))
                 return
         self.error.setText("failed to load: " + name)
 
     @pyqtSlot()
     def load_best_click(self):
-        self.error.clear()
+        self.reset_log()
         name = self.load_name.text()
         folder = Path("models/" + name)
         if folder.is_dir():
@@ -453,12 +467,13 @@ class RicochetGui(QWidget):
                 self.brain_handler.initialize()
                 self.graph = tf.get_default_graph()
                 self.set_current_enemy(name)
+                self.success.setText("successfully loaded {}".format(min_files[0]))
                 return
         self.error.setText("failed to load: " + name)
 
     @pyqtSlot()
     def load_vers_click(self):
-        self.error.clear()
+        self.reset_log()
         name = self.load_name.text()
         folder = Path("models/" + name)
         vers = str(self.version.text())
@@ -472,6 +487,7 @@ class RicochetGui(QWidget):
                 self.graph = tf.get_default_graph()
                 self.name.setText(name)
                 self.set_current_enemy(name)
+                self.success.setText("successfully loaded {}".format(my_file))
                 return
         self.error.setText("failed to load: " + name + " with vers.: " + vers)
 

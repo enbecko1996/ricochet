@@ -47,9 +47,10 @@ class stats_collector():
             plt.show()
 
 
-class debugger():
+class debugger:
     render = False
-    log_epoch = 30
+    log_epoch = 2
+    snapshot = 50
 
     def reset(self):
         pass

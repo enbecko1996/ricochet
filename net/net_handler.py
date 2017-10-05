@@ -65,37 +65,42 @@ class Handler:
         print("Starting Training")
         while epoch < self.hp.EPOCHS and self.training:
             epoch += 1
-            print(epoch, end=" ")
+            # print(epoch, end=' ', flush=True)
             steps, reward = self.the_environment.run(self.agent, board_style)
             stats.collect('steps', steps)
             stats.collect('rewards', reward)
             if epoch % debug.log_epoch == 0:
                 game_steps = []
                 game_rewards = []
-                avg_steps = np.mean(stats.steps[-debug.log_epoch:])
-                poller_len = debug.log_epoch if avg_steps < self.hp.MINIMUM_CAPTURE_THRESH else 1
+                avg_train_steps = np.mean(stats.steps[-debug.log_epoch:])
+                poller_len = debug.log_epoch if avg_train_steps < self.hp.MINIMUM_CAPTURE_THRESH else 3
                 for i in range(poller_len):
                     g_steps, g_rewards = self.the_environment.play_game(self.agent, board_style)
                     game_steps.append(g_steps)
                     game_rewards.append(g_rewards)
-                avg_steps = np.mean(game_steps)
+                avg_game_steps = np.mean(game_steps)
 
-                if avg_steps < self.minimum:
-                    self.agent.brain.model.save(str(self.min_folder) + "/worker_" + str(avg_steps) + ".h5")
-                    self.agent.brain.model_.save(str(self.min_folder) + "/feeder_" + str(avg_steps) + ".h5")
-                    self.minimum = avg_steps
+                if avg_game_steps < self.minimum:
+                    self.agent.brain.model.save(str(self.min_folder) + "/worker_" + str(avg_game_steps) + ".h5")
+                    self.agent.brain.model_.save(str(self.min_folder) + "/feeder_" + str(avg_game_steps) + ".h5")
+                    self.minimum = avg_game_steps
 
+                print("avg. steps training = {0}".format(avg_train_steps))
                 print("avg. reward = {0}".format(np.mean(game_rewards)))
                 print("episode: {}/{}, steps: {}".format(epoch, self.hp.EPOCHS, steps),
-                      "avg. steps last {} finishes = {}".format(debug.log_epoch,
-                                                                avg_steps),
+                      "avg. steps last {} finishes = {}".format(poller_len, avg_game_steps),
                       "epsilon = {}".format(self.agent.epsilon))
+                print("--------------------------------------------------------------------------------")
 
                 if self.gui is not None:
-                    self.gui.add_data_point(epoch, avg_steps)
+                    self.gui.add_data_point(epoch, avg_game_steps, avg_train_steps)
                     self.gui.plot()
-                stats.collect('big_steps', avg_steps)
+                stats.collect('big_steps', avg_game_steps)
                 stats.steps.clear()
+
+            if epoch % debug.snapshot == 0:
+                self.save_model()
+
         if self.save:
             self.save_model()
         self.finished = True
@@ -118,6 +123,7 @@ class Handler:
         with open(folder + "/" + vers + "/hp.txt", 'w') as outfile:
             json.dump(self.hp.__dict__, outfile)
         self.gui.save_plot_to_disk(folder + "/" + vers + "/plot")
+        print("saved model")
 
     def make_status_gui(self):
         self.gui = status_gui.Status(self)

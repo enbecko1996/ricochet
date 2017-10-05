@@ -15,7 +15,8 @@ class Status(QWidget):
         super().__init__()
         self.brain_handler = brain_handler
         self.epochs = []
-        self.steps = []
+        self.game_steps = []
+        self.train_steps = []
         self.poly_x = [0, 1]
         self.poly_y = [0, 0]
         self.initUI()
@@ -56,16 +57,18 @@ class Status(QWidget):
 
     def plot(self):
         self.ax.clear()
-        self.ax.plot(self.epochs, self.steps, '*-', color='green')
+        self.ax.plot(self.epochs, self.game_steps, '*-', color='green')
+        self.ax.plot(self.epochs, self.train_steps, '*-', color='blue')
         self.ax.plot(self.poly_x, self.poly_y, '*-', color='red')
         self.ax.set_xlabel('epoch')
         self.ax.set_ylabel('avg. steps')
         self.canvas.draw()
 
-    def add_data_point(self, epoch, steps):
+    def add_data_point(self, epoch, game_steps, train_steps):
         self.epochs.append(epoch)
-        self.steps.append(steps)
-        m, b = np.polyfit(self.epochs, self.steps, 1)
+        self.game_steps.append(game_steps)
+        self.train_steps.append(train_steps)
+        m, b = np.polyfit(self.epochs, self.game_steps, 1)
         if len(self.epochs) == 1:
             self.poly_x[0] = np.min(self.epochs)
         self.poly_x[1] = np.max(self.epochs)
