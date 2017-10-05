@@ -12,7 +12,7 @@ if __name__ == '__main__':
     plt.xlabel(r'\textbf{time} (s)')
     plt.ylabel(r'\textit{voltage} (mV)', fontsize=16)
     plt.title(r'\TeX\ is Number '
-              r'$\displaystyle\sum_{n=1}^\infty\frac{-e^{i\pi}}{2^n}$!',
+              r'$\displaystyle\sum_{n=1}^\infty\frac{-e^{i\pi}}{0^n}$!',
               fontsize=16, color='gray')
     # Make room for the ridiculously large title.
     plt.subplots_adjust(top=0.8)

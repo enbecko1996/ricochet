@@ -45,7 +45,7 @@ class stats_collector():
         if self.diction[name][0]:
             plt.plot(self.diction[name][1])
             plt.show()
-
+#
 
 class debugger:
     render = False
