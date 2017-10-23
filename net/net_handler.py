@@ -17,10 +17,10 @@ class Handler:
     def __init__(self, name, version, conv, worker=None, feeder=None, hyperparams=None):
         hlp.to_wrkdir()
         self.gui = None
-        self.hp = hyperparameter.hyperparams()
-        if hyperparams is not None:
-            self.hp = hyperparams
-        self.the_environment = Environment(conv, the_game.Environment(16))
+        self.hp = hyperparams
+        if hyperparams is None:
+            self.hp = hyperparameter.AgentsHyperparameters()
+        self.the_environment = Environment(conv, the_game.Environment(8))
         self.conv = conv
         self.training = False
         self.finished = False
@@ -67,14 +67,14 @@ class Handler:
         while epoch < self.hp.EPOCHS and self.training:
             epoch += 1
             print(epoch, end=' ', flush=True)
-            steps, reward = self.the_environment.run(self.agent, board_style)
+            steps, reward = self.the_environment.run(self.agent, board_style, epoch=epoch)
             stats.collect('steps', steps)
             stats.collect('rewards', reward)
             if epoch % debug.log_epoch == 0:
                 game_steps = []
                 game_rewards = []
                 avg_train_steps = np.mean(stats.steps[-debug.log_epoch:])
-                poller_len = debug.log_epoch if avg_train_steps < self.hp.MINIMUM_CAPTURE_THRESH else 3
+                poller_len = debug.log_epoch if avg_train_steps < self.hp.MINIMUM_CAPTURE_THRESH else 20
                 for i in range(poller_len):
                     g_steps, g_rewards = self.the_environment.play_game(self.agent, board_style)
                     game_steps.append(g_steps)
@@ -140,4 +140,16 @@ class Handler:
         self.training = False
 
     def play_game(self, env_on):
-        return self.the_environment.play_game(self.agent, env_on=env_on, return_actions=True)
+        r = 0
+        min_acts = self.hp.MAX_STEPS
+        out_steps, out_total_reward, out_actions = [], [], []
+        while r < 0.4:
+            steps, total_reward, actions = self.the_environment.play_game(self.agent, env_on=env_on,
+                                                                          return_actions=True, ran=r)
+            if len(actions) < min_acts:
+                min_acts = len(actions)
+                out_steps, out_total_reward, out_actions = steps, total_reward, actions
+            r += 0.0001
+        for a in out_actions:
+            print(the_game.print_action(a), end=' ')
+        return out_steps, out_total_reward, out_actions

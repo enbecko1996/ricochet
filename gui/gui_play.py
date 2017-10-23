@@ -14,7 +14,7 @@ from gui import gui_hps as gui_hps, game_items_drawer as drawer
 import os
 import keras.backend as K
 
-allowed_board_styles = ['same', 'random']
+allowed_board_styles = ['same', 'random', 'small']
 same_board_style = [[0, 0], [1, 1], [2, 0], [3, 1]]
 
 
@@ -63,7 +63,7 @@ class Picker(QWidget):
 
         env = self.parentWidget().env
         x, y = int(mouseX / self.btn_size), int(mouseY / self.btn_size)
-        if x <= 0 and self.content[y][x] >= 0:
+        if x <= 0 <= self.content[y][x]:
             env.add_single_figure(self.opened_at, self.content[y][x])
         elif self.content[y][x] >= 0:
             env.add_single_goal(self.opened_at, self.content[y][x])
@@ -107,7 +107,7 @@ class Picker(QWidget):
 class Board(QWidget):
     def __init__(self, parent=None):
         QWidget.__init__(self, parent)
-        self.env = Environment(16, board_style=same_board_style)
+        self.env = Environment(8, board_style='small')
         self.clear()
         self.initUI()
 
@@ -120,8 +120,9 @@ class Board(QWidget):
         self.pick.hide()
 
     def clear(self):
+        self.env.add_surrounding()
         # self.env.reset(figure_style='none', board_style=same_board_style)
-        """self.env.set_quadrant(1, "quadrants/pre_0_1.npy")
+        """self.env.set_quadrant(low, "quadrants/pre_0_1.npy")
         self.env.set_quadrant(0, "quadrants/pre_7_1.npy")
         self.env.set_quadrant(3, "quadrants/pre_3_0.npy")
         self.env.set_quadrant(4, "quadrants/pre_2_1.npy")"""
@@ -198,6 +199,8 @@ import tensorflow as tf
 from threading import Thread
 from os import listdir
 from os.path import isfile, join
+import json
+import hyperparameter as hps
 
 
 class RicochetGui(QWidget):
@@ -350,7 +353,7 @@ class RicochetGui(QWidget):
         if self.board.env.cur_goal_pos is not None and len(self.board.env.figs_on_board) == game.num_figures:
             if self.brain_handler is not None:
                 steps, reward, actions = self.brain_handler.play_game(self.board.env)
-                print(len(actions), actions)
+                print("\n", len(actions), actions)
                 return
         self.error.setText("no goal set, too less figures or brain_handler is None.")
 
@@ -372,7 +375,10 @@ class RicochetGui(QWidget):
         name = self.name.text()
         path = "models/" + name
         if self.board_style.text() in allowed_board_styles and (not os.path.isdir(path) or self.graph is not None):
-            self.hp_tweak = gui_hps.HyperParameters(self)
+            if self.brain_handler is None:
+                self.hp_tweak = gui_hps.GUI_HyperParameters(self)
+            else:
+                self.hp_tweak = gui_hps.GUI_HyperParameters(self, self.brain_handler.hp)
             self.hp_tweak.show()
         else:
             self.error.setText("Can't create {}, because a model with that name already exists or wrong style.".format(name))
@@ -392,12 +398,11 @@ class RicochetGui(QWidget):
         style = self.board_style.text()
         if style == 'same':
             style = same_board_style
-        elif style == 'random':
+        elif style == 'random' or style == 'small':
             pass
         else:
             self.error.setText("specified style is invalid")
             return
-        print("heeeey")
         if self.graph is not None:
             with self.graph.as_default():
                 self.brain_handler.initialize()
@@ -415,28 +420,22 @@ class RicochetGui(QWidget):
         if os.path.isdir(folder):
             my_file = Path(folder + "/0/worker.h5")
             my_file_2 = Path(folder + "/0/feeder.h5")
-            i = 0
+            i = -1
             while my_file.is_file() or my_file_2.is_file():
-                i += 1
                 print(i)
+                i += 1
+                my_file = Path(folder + "/" + str(i + 1) + "/worker.h5")
+                my_file_2 = Path(folder + "/" + str(i + 1) + "/feeder.h5")
+            if i > -1:
                 my_file = Path(folder + "/" + str(i) + "/worker.h5")
                 my_file_2 = Path(folder + "/" + str(i) + "/feeder.h5")
-            if i > 0:
-                if i > 1:
-                    my_file = Path(folder + "/" + str(i - 1) + "/worker.h5")
-                    my_file_2 = Path(folder + "/" + str(i - 1) + "/feeder.h5")
-                else:
-                    my_file = Path(folder + "/0/worker.h5")
-                    my_file_2 = Path(folder + "/0/feeder.h5")
-            self.name.setText(name)
-            self.brain_handler = net_handler.Handler(name, i, conv=self.conv.isChecked(),
-                                                         worker=my_file, feeder=my_file_2)
-            self.brain_handler.initialize()
-            self.graph = tf.get_default_graph()
-            self.set_current_enemy(name)
-            self.success.setText("successfully loaded {}".format(my_file))
-            return
-        self.error.setText("failed to load:", name)
+                with open(folder + "/" + str(i) + "/hp.txt", 'r') as f:
+                    data = json.load(f)
+                    cur_hps = hps.AgentsHyperparameters()
+                    cur_hps.__dict__ = data
+                self.load_agent(name, i + 1, my_file, my_file_2, cur_hps)
+                return
+        self.error.setText("failed to load:" + name)
 
     @pyqtSlot()
     def load_best_click(self):
@@ -463,13 +462,11 @@ class RicochetGui(QWidget):
                 cur_fold = folder + "/" + str(i) + "/local min"
                 my_path = Path(cur_fold)
             if len(min_files[0]) > 0 and len(min_files[1]) > 0:
-                self.name.setText(name)
-                self.brain_handler = net_handler.Handler(name, i, conv=self.conv.isChecked(),
-                                                         worker=min_files[0], feeder=min_files[1])
-                self.brain_handler.initialize()
-                self.graph = tf.get_default_graph()
-                self.set_current_enemy(name)
-                self.success.setText("successfully loaded {}".format(min_files[0]))
+                with open(folder + "/" + str(i) + "/hp.txt", 'r') as f:
+                    data = json.load(f)
+                    cur_hps = hps.AgentsHyperparameters()
+                    cur_hps.__dict__ = data
+                self.load_agent(name, i, min_files[0], min_files[1], cur_hps)
                 return
         self.error.setText("failed to load: " + name)
 
@@ -484,14 +481,22 @@ class RicochetGui(QWidget):
             my_file = Path(folder + "/" + vers + "/worker.h5")
             my_file_2 = Path(folder + "/" + vers + "/feeder.h5")
             if my_file.is_file() and my_file_2.is_file():
-                self.brain_handler = net_handler.Handler(name, vers, conv=self.conv.isChecked(), worker=my_file, feeder=my_file_2)
-                self.brain_handler.initialize()
-                self.graph = tf.get_default_graph()
-                self.name.setText(name)
-                self.set_current_enemy(name)
-                self.success.setText("successfully loaded {}".format(my_file))
+                with open(folder + "/" + vers + "/hp.txt", 'r') as f:
+                    data = json.load(f)
+                    cur_hps = hps.AgentsHyperparameters()
+                    cur_hps.__dict__ = data
+                self.load_agent(name, int(vers) + 1, my_file, my_file_2, cur_hps)
                 return
         self.error.setText("failed to load: " + name + " with vers.: " + vers)
+
+    def load_agent(self, name, vers, worker_file, feeder_file, cur_hps=None):
+        self.brain_handler = net_handler.Handler(name, vers, conv=self.conv.isChecked(), worker=worker_file,
+                                                 feeder=feeder_file, hyperparams=cur_hps)
+        self.brain_handler.initialize()
+        self.graph = tf.get_default_graph()
+        self.name.setText(name)
+        self.set_current_enemy(name)
+        self.success.setText("successfully loaded {}".format(worker_file))
 
     def closeEvent(self, event):
         event.accpt()

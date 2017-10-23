@@ -16,7 +16,7 @@ from collections import deque
 # import gym
 import matplotlib.pyplot as plt
 import numpy
-
+import hyperparameter
 
 # ----------------DEBUG-----------------
 
@@ -80,6 +80,7 @@ def huber_loss(y_true, y_pred):
 from keras.models import Sequential, load_model
 from keras.layers import *
 from keras.optimizers import *
+from keras.regularizers import *
 
 
 class Brain:
@@ -110,7 +111,9 @@ class Brain:
             model.add(Dense(units=80, activation='relu'))
             model.add(Dense(units=self.actionCnt, activation='linear'))
         else:
-            model.add(Dense(units=int(self.stateCnt * (2./3) + self.actionCnt), activation='relu', input_dim=self.stateCnt))
+            num = int(self.stateCnt * (2./3) + self.actionCnt)
+            model.add(Dense(units=num, activation='relu', input_dim=self.stateCnt))
+            # model.add(Dropout(0.1))
             # model.add(Dense(units=200, activation='relu'))
             model.add(Dense(units=self.actionCnt, activation='linear'))
 
@@ -161,7 +164,7 @@ class Agent:
     def __init__(self, handler, conv, state_count=0, action_count=0, grid_size=0, dims=0, worker=None, feeder=None):
         self.handler = handler
         self.steps = 0
-        self.epsilon = self.handler.hp.MAX_EPSILON
+        self.epsilon = self.handler.hp.E_DECAY[1]['MAX_EPSILON']
         self.conv = conv
         self.stateCnt = state_count
         self.actionCnt = action_count
@@ -177,7 +180,7 @@ class Agent:
         else:
             return numpy.argmax(self.brain.predictOne(s))
 
-    def observe(self, sample):  # in (s, a, r, s_) format
+    def observe(self, sample, epoch):  # in (s, a, r, s_) format
         self.memory.add(sample)
 
         if self.steps % self.handler.hp.UPDATE_TARGET_FREQUENCY == 0:
@@ -185,8 +188,9 @@ class Agent:
 
         # slowly decrease Epsilon based on our eperience
         self.steps += 1
-        self.epsilon = self.handler.hp.MIN_EPSILON + (self.handler.hp.MAX_EPSILON - self.handler.hp.MIN_EPSILON) \
-                                                    * math.exp(-self.handler.hp.LAMBDA * self.steps)
+        e_decay = self.handler.hp.E_DECAY
+        e_method = getattr(hyperparameter, e_decay[0])
+        self.epsilon = e_method(e_decay[1], self.epsilon, cur_epoch=epoch, cur_steps=self.steps)
 
     def replay(self):
         batch = self.memory.sample(self.handler.hp.BATCH_SIZE)
@@ -251,7 +255,7 @@ class RandomAgent:
     def act(self, s):
         return random.randrange(0, self.actionCnt)
 
-    def observe(self, sample):  # in (s, a, r, s_) format
+    def observe(self, sample, epoch):  # in (s, a, r, s_) format
         self.memory.add(sample)
 
     def replay(self):

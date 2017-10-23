@@ -8,7 +8,8 @@ from gui import game_items_drawer as g
 
 grid_size = 4
 figures = ['red', 'green', 'blue', 'yellow', 'grey']
-num_figures = len(figures)
+# num_figures = len(figures)
+num_figures = 3
 goals = ['placeholder']
 red_goals = ['red_hexagon', 'red_square', 'red_triangle', 'red_circle']
 green_goals = ['green_hexagon', 'green_square', 'green_triangle', 'green_circle']
@@ -49,6 +50,7 @@ fig_dict = {0: ('red', red_goals, 'R', red), 1: ('green', green_goals, 'G', gree
             4: ('grey', grey_goals, 'g', grey)}
 
 all_quadrants = np.load("quadrants/pre_all.npy")
+smallrgb = np.load("small/r-g-b.npy")
 
 in_wall_reward = -2.0
 step_reward = -1.0
@@ -108,11 +110,14 @@ class Environment:
     def set_state(self, other_env):
         self.the_state = np.array(other_env.the_state)
         self.reduced_state = np.array(other_env.reduced_state)
+        self.set_current_goal(other_env.cur_goal)
 
     def apply_board_style(self, board_style):
         if isinstance(board_style, str):
             if board_style == 'random':
                 self.set_random_board()
+            if board_style == 'small':
+                self.set_full(smallrgb)
         elif board_style is not None:
             for i in range(4):
                 self.set_quadrant(i + 1, all_quadrants[board_style[i][0]][board_style[i][1]])
@@ -178,6 +183,14 @@ class Environment:
                     if self.the_state[x][half_g - 1][1] == 1:
                         self.the_state[x][half_g][3] = 1
                         self.reduced_state[x][half_g][3] = 1
+
+    def set_full(self, full):
+        for x in range(0, self.grid_size):
+            for y in range(0, self.grid_size):
+                self.the_state[x][y] = full[x][y]
+                self.reduced_state[x][y][:4 + num_figures] = full[x][y][:4 + num_figures]
+                if self.the_state[x][y][4 + num_figures] > 0:
+                    self.goals_on_board.append(self.the_state[x][y][4 + num_figures])
 
     def set_quadrant(self, quad, quad_state):
         if 1 <= quad <= 4:
@@ -267,6 +280,7 @@ class Environment:
         if gol in self.goals_on_board:
             self.goals_on_board.remove(gol)
         self.the_state[x][y][4:] = 0
+        self.reduced_state[x][y][4:] = 0
 
     def get_goal_at(self, x, y):
         idx = self.the_state[x][y][4 + num_figures]
