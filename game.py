@@ -35,7 +35,7 @@ blue_g = (140, 140, 255)
 yellow_g = (255, 255, 140)
 grey_g = (0, 0, 0)
 
-goal_dict = {1: ('red_hexagon', 'R*', red_g, g.hexagon), 2: ('red_square', 'R#', red_g, g.square), 
+goal_dict = {1: ('red_hexagon', 'R*', red_g, g.hexagon), 2: ('red_square', 'R#', red_g, g.square),
              3: ('red_triangle', 'R^', red_g, g.triangle), 4: ('red_circle', 'R°', red_g, g.circle),
              5: ('green_hexagon', 'G*', green_g, g.hexagon), 6: ('green_square', 'G#', green_g, g.square),
              7: ('green_triangle', 'G^', green_g, g.triangle), 8: ('green_circle', 'G°', green_g, g.circle),
@@ -69,13 +69,13 @@ action_size = len(actions)
 
 class Environment:
     def __init__(self, g_size, board_style='none'):
-        self.the_state = np.zeros((g_size, g_size, 4 + num_figures + 1), dtype=np.int)
-        self.reduced_state = np.zeros((g_size, g_size, 4 + num_figures + num_figures), dtype=np.int)
+        self.visible_state = np.zeros((g_size, g_size, 4 + num_figures + 1), dtype=np.int)
+        self.game_state = np.zeros((g_size, g_size, 4 + num_figures + num_figures), dtype=np.int)
         self.grid_size = g_size
         self.num_figures = num_figures
         self.num_goals = num_goals
-        self.observation_space = self.the_state.shape
-        self.flattened_input_size = self.grid_size**2 * (4 + num_figures + num_figures)
+        self.observation_space = self.visible_state.shape
+        self.flattened_input_size = self.grid_size ** 2 * (4 + num_figures + num_figures)
         self.action_size = action_size
         self.dims = 4 + num_figures + num_figures
         self.cur_goal_name = None
@@ -87,8 +87,8 @@ class Environment:
         self.apply_board_style(board_style)
 
     def reset(self, flattened=True, figure_style='same', board_style='none', goal_style='random'):
-        self.the_state = np.zeros((self.grid_size, self.grid_size, 4 + num_figures + 1), dtype=np.int)
-        self.reduced_state = np.zeros((self.grid_size, self.grid_size, 4 + num_figures + num_figures), dtype=np.int)
+        self.visible_state = np.zeros((self.grid_size, self.grid_size, 4 + num_figures + 1), dtype=np.int)
+        self.game_state = np.zeros((self.grid_size, self.grid_size, 4 + num_figures + num_figures), dtype=np.int)
         self.figs_on_board.clear()
         self.goals_on_board.clear()
         self.apply_board_style(board_style)
@@ -105,11 +105,11 @@ class Environment:
         if flattened:
             return self.get_flattened_reduced_state()
         else:
-            return np.array(self.reduced_state)
+            return np.array(self.game_state)
 
-    def set_state(self, other_env):
-        self.the_state = np.array(other_env.the_state)
-        self.reduced_state = np.array(other_env.reduced_state)
+    def set_state_from_other_env(self, other_env):
+        self.visible_state = np.array(other_env.visible_state)
+        self.game_state = np.array(other_env.game_state)
         self.set_current_goal(other_env.cur_goal)
 
     def apply_board_style(self, board_style):
@@ -133,64 +133,64 @@ class Environment:
             self.set_quadrant(i + 1, all_quadrants[next_quad][style])
 
     def save_current_game(self, filename):
-        np.save(filename, self.the_state)
+        np.save(filename, self.visible_state)
 
     def save_current_as_quadrant(self, filename):
-        lis = [self.the_state, hlp.get_rotated_quadrant(2, self.the_state, self.grid_size / 2),
-               hlp.get_rotated_quadrant(3, self.the_state, self.grid_size / 2),
-               hlp.get_rotated_quadrant(4, self.the_state, self.grid_size / 2)]
+        lis = [self.visible_state, hlp.get_rotated_quadrant(2, self.visible_state, self.grid_size / 2),
+               hlp.get_rotated_quadrant(3, self.visible_state, self.grid_size / 2),
+               hlp.get_rotated_quadrant(4, self.visible_state, self.grid_size / 2)]
         np.save(filename, np.array(lis))
 
     def load_game(self, filename):
-        self.the_state = hlp.load_state(filename)
+        self.visible_state = hlp.load_state(filename)
 
     def cleanup(self):
         half_g = int(self.grid_size / 2)
         for quad in range(1, 5):
             if quad == 1:
                 for y in range(0, half_g):
-                    if self.the_state[half_g][y][2] == 1:
-                        self.the_state[half_g - 1][y][0] = 1
-                        self.reduced_state[half_g - 1][y][0] = 1
+                    if self.visible_state[half_g][y][2] == 1:
+                        self.visible_state[half_g - 1][y][0] = 1
+                        self.game_state[half_g - 1][y][0] = 1
                 for x in range(half_g, self.grid_size):
-                    if self.the_state[x][half_g - 1][1] == 1:
-                        self.the_state[x][half_g][3] = 1
-                        self.reduced_state[x][half_g][3] = 1
+                    if self.visible_state[x][half_g - 1][1] == 1:
+                        self.visible_state[x][half_g][3] = 1
+                        self.game_state[x][half_g][3] = 1
             elif quad == 2:
                 for y in range(half_g, self.grid_size):
-                    if self.the_state[half_g][y][2] == 1:
-                        self.the_state[half_g - 1][y][0] = 1
-                        self.reduced_state[half_g - 1][y][0] = 1
+                    if self.visible_state[half_g][y][2] == 1:
+                        self.visible_state[half_g - 1][y][0] = 1
+                        self.game_state[half_g - 1][y][0] = 1
                 for x in range(half_g, self.grid_size):
-                    if self.the_state[x][half_g][3] == 1:
-                        self.the_state[x][half_g - 1][1] = 1
-                        self.reduced_state[x][half_g - 1][1] = 1
+                    if self.visible_state[x][half_g][3] == 1:
+                        self.visible_state[x][half_g - 1][1] = 1
+                        self.game_state[x][half_g - 1][1] = 1
             elif quad == 3:
                 for y in range(half_g, self.grid_size):
-                    if self.the_state[half_g - 1][y][0] == 1:
-                        self.the_state[half_g][y][2] = 1
-                        self.reduced_state[half_g][y][2] = 1
+                    if self.visible_state[half_g - 1][y][0] == 1:
+                        self.visible_state[half_g][y][2] = 1
+                        self.game_state[half_g][y][2] = 1
                 for x in range(0, half_g):
-                    if self.the_state[x][half_g][3] == 1:
-                        self.the_state[x][half_g - 1][1] = 1
-                        self.reduced_state[x][half_g - 1][1] = 1
+                    if self.visible_state[x][half_g][3] == 1:
+                        self.visible_state[x][half_g - 1][1] = 1
+                        self.game_state[x][half_g - 1][1] = 1
             elif quad == 4:
                 for y in range(0, half_g):
-                    if self.the_state[half_g - 1][y][0] == 1:
-                        self.the_state[half_g][y][2] = 1
-                        self.reduced_state[half_g][y][2] = 1
+                    if self.visible_state[half_g - 1][y][0] == 1:
+                        self.visible_state[half_g][y][2] = 1
+                        self.game_state[half_g][y][2] = 1
                 for x in range(0, half_g):
-                    if self.the_state[x][half_g - 1][1] == 1:
-                        self.the_state[x][half_g][3] = 1
-                        self.reduced_state[x][half_g][3] = 1
+                    if self.visible_state[x][half_g - 1][1] == 1:
+                        self.visible_state[x][half_g][3] = 1
+                        self.game_state[x][half_g][3] = 1
 
     def set_full(self, full):
         for x in range(0, self.grid_size):
             for y in range(0, self.grid_size):
-                self.the_state[x][y] = full[x][y]
-                self.reduced_state[x][y][:4 + num_figures] = full[x][y][:4 + num_figures]
-                if self.the_state[x][y][4 + num_figures] > 0:
-                    self.goals_on_board.append(self.the_state[x][y][4 + num_figures])
+                self.visible_state[x][y] = full[x][y]
+                self.game_state[x][y][:4 + num_figures] = full[x][y][:4 + num_figures]
+                if self.visible_state[x][y][4 + num_figures] > 0:
+                    self.goals_on_board.append(self.visible_state[x][y][4 + num_figures])
 
     def set_quadrant(self, quad, quad_state):
         if 1 <= quad <= 4:
@@ -200,31 +200,33 @@ class Environment:
             if quad == 1:
                 for x in range(half_g, self.grid_size):
                     for y in range(0, half_g):
-                        self.the_state[x][y] = quad_state[0][x - half_g][y]
-                        self.reduced_state[x][y][:4 + num_figures] = quad_state[0][x - half_g][y][:4 + num_figures]
-                        if self.the_state[x][y][4 + num_figures] > 0:
-                            self.goals_on_board.append(self.the_state[x][y][4 + num_figures])
+                        self.visible_state[x][y] = quad_state[0][x - half_g][y]
+                        self.game_state[x][y][:4 + num_figures] = quad_state[0][x - half_g][y][:4 + num_figures]
+                        if self.visible_state[x][y][4 + num_figures] > 0:
+                            self.goals_on_board.append(self.visible_state[x][y][4 + num_figures])
             elif quad == 2:
                 for x in range(half_g, self.grid_size):
                     for y in range(half_g, self.grid_size):
-                        self.the_state[x][y] = quad_state[1][x - half_g][y - half_g]
-                        self.reduced_state[x][y][:4 + num_figures] = quad_state[1][x - half_g][y - half_g][:4 + num_figures]
-                        if self.the_state[x][y][4 + num_figures] > 0:
-                            self.goals_on_board.append(self.the_state[x][y][4 + num_figures])
+                        self.visible_state[x][y] = quad_state[1][x - half_g][y - half_g]
+                        self.game_state[x][y][:4 + num_figures] = quad_state[1][x - half_g][y - half_g][
+                                                                  :4 + num_figures]
+                        if self.visible_state[x][y][4 + num_figures] > 0:
+                            self.goals_on_board.append(self.visible_state[x][y][4 + num_figures])
             elif quad == 3:
                 for x in range(0, half_g):
                     for y in range(half_g, self.grid_size):
-                        self.the_state[x][y] = quad_state[2][x - half_g][y - half_g]
-                        self.reduced_state[x][y][:4 + num_figures] = quad_state[2][x - half_g][y - half_g][:4 + num_figures]
-                        if self.the_state[x][y][4 + num_figures] > 0:
-                            self.goals_on_board.append(self.the_state[x][y][4 + num_figures])
+                        self.visible_state[x][y] = quad_state[2][x - half_g][y - half_g]
+                        self.game_state[x][y][:4 + num_figures] = quad_state[2][x - half_g][y - half_g][
+                                                                  :4 + num_figures]
+                        if self.visible_state[x][y][4 + num_figures] > 0:
+                            self.goals_on_board.append(self.visible_state[x][y][4 + num_figures])
             elif quad == 4:
                 for x in range(0, half_g):
                     for y in range(0, half_g):
-                        self.the_state[x][y] = quad_state[3][x - half_g][y]
-                        self.reduced_state[x][y][:4 + num_figures] = quad_state[3][x - half_g][y][:4 + num_figures]
-                        if self.the_state[x][y][4 + num_figures] > 0:
-                            self.goals_on_board.append(self.the_state[x][y][4 + num_figures])
+                        self.visible_state[x][y] = quad_state[3][x - half_g][y]
+                        self.game_state[x][y][:4 + num_figures] = quad_state[3][x - half_g][y][:4 + num_figures]
+                        if self.visible_state[x][y][4 + num_figures] > 0:
+                            self.goals_on_board.append(self.visible_state[x][y][4 + num_figures])
 
     def set_figures(self, style):
         if style == 'none':
@@ -244,60 +246,68 @@ class Environment:
     def get_current_goal_pos(self):
         for x in range(self.grid_size):
             for y in range(self.grid_size):
-                gol = self.reduced_state[x][y][4 + num_figures: 4 + 2 * num_figures]
+                gol = self.game_state[x][y][4 + num_figures: 4 + 2 * num_figures]
                 gol = hlp.one_hot_to_id(gol)
                 if gol > -1:
                     return x, y
 
     def set_current_goal(self, gol):
         if self.cur_goal_pos is not None:
-            self.reduced_state[self.cur_goal_pos[0]][self.cur_goal_pos[1]][4 + num_figures:4 + 2 * num_figures] = 0
+            self.game_state[self.cur_goal_pos[0]][self.cur_goal_pos[1]][4 + num_figures:4 + 2 * num_figures] = 0
         if isinstance(gol, str):
             self.cur_goal_name = gol
             self.cur_goal = goals.index(self.cur_goal_name)
         elif isinstance(gol, int):
             self.cur_goal_name = goal_dict[gol][0]
             self.cur_goal = gol
-        self.cur_goal_pos = self.get_pos_on_board(self.the_state, self.cur_goal_name)
+        self.cur_goal_pos = self.get_pos_on_board(self.cur_goal_name, state=self.visible_state,)
         self.cur_goal_color = get_goal_color(self.cur_goal_name)
         if self.cur_goal_name != 'all':
-            self.reduced_state[self.cur_goal_pos[0]][self.cur_goal_pos[1]][4 + num_figures:4 + 2 * num_figures] = \
+            self.game_state[self.cur_goal_pos[0]][self.cur_goal_pos[1]][4 + num_figures:4 + 2 * num_figures] = \
                 hlp.as_one_hot(self.cur_goal_color, num_figures)
         else:
-            self.reduced_state[self.cur_goal_pos[0]][self.cur_goal_pos[1]][4 + num_figures:4 + 2 * num_figures] = 1
+            self.game_state[self.cur_goal_pos[0]][self.cur_goal_pos[1]][4 + num_figures:4 + 2 * num_figures] = 1
 
-    def get_flattened_reduced_state(self):
-        return np.array(np.reshape(self.reduced_state, (self.flattened_input_size,)))
+    def get_flattened_reduced_state(self, state=None):
+        if state is None:
+            state = self.game_state
+        return np.array(np.reshape(state, (self.flattened_input_size,)))
 
-    def get_reduced_state(self):
-        return np.array(self.reduced_state)
+    def get_reduced_state(self, state=None):
+        if state is None:
+            state = self.game_state
+        return np.array(state)
 
     def clear_pos(self, x, y):
-        fig = hlp.one_hot_to_id(self.the_state[x][y][4:4 + num_figures])
-        gol = self.the_state[x][y][4 + num_figures]
+        fig = hlp.one_hot_to_id(self.game_state[x][y][4:4 + num_figures])
+        gol = self.visible_state[x][y][4 + num_figures]
         if fig in self.figs_on_board:
             self.figs_on_board.remove(fig)
         if gol in self.goals_on_board:
             self.goals_on_board.remove(gol)
-        self.the_state[x][y][4:] = 0
-        self.reduced_state[x][y][4:] = 0
+        self.visible_state[x][y][4:] = 0
+        self.game_state[x][y][4:] = 0
 
     def get_goal_at(self, x, y):
-        idx = self.the_state[x][y][4 + num_figures]
+        idx = self.visible_state[x][y][4 + num_figures]
         if idx > 0:
             return goal_dict[idx][0]
         return None
 
-    def get_pos_on_board(self, state, test):
+    def get_pos_on_board(self, test, state=None):
         if test is not None:
             if isinstance(test, str):
                 if test in figures:
+                    if state is None:
+                        state = self.game_state
                     test = hlp.as_one_hot(figures.index(test), num_figures)
                     for x in range(self.grid_size):
                         for y in range(self.grid_size):
                             if np.array_equal(state[x][y][4:4 + num_figures], test):
                                 return x, y
                 if test in goals:
+                    if state is None:
+                        state = self.visible_state
                     test = goals.index(test)
                     for x in range(self.grid_size):
                         for y in range(self.grid_size):
@@ -308,12 +318,13 @@ class Environment:
         if flattened and state is not None:
             state = state.reshape(self.grid_size, self.grid_size, 4 + num_figures + num_figures)
         if state is None:
-            state = self.the_state
+            state = self.game_state
         valid = []
         for act in actions:
-            fig_pos = self.get_pos_on_board(state, fig_dict[act.figure][0])
-            if self.is_valid_action(state, fig_pos, act.direction):
-                valid.append(actions.index(act))
+            fig_pos = self.get_pos_on_board(fig_dict[act.figure][0], state=state)
+            if fig_pos is not None:
+                if self.is_valid_action(state, fig_pos, act.direction):
+                    valid.append(actions.index(act))
         return valid
 
     def is_valid_action(self, state, pos, direc):
@@ -322,35 +333,45 @@ class Environment:
             return True
         return False
 
-    def step(self, a_int, flattened=True):
+    def step(self, a_int, flattened=True, state=None, hyperparams=None):
         a = actions[a_int]
-        apply = self.apply_action_and_get_reward(a.figure, a.direction)
+        apply = self.apply_action_and_get_reward(a.figure, a.direction, state=state, hyperparams=hyperparams)
         if flattened:
-            return self.get_flattened_reduced_state(), apply[0], apply[1], None
+            return self.get_flattened_reduced_state(state=state), apply[0], apply[1], None
         else:
-            return np.array(self.reduced_state), apply[0], apply[1], None
+            return self.get_reduced_state(state=state), apply[0], apply[1], None
 
-            # fig as id and not one-hot, direc as well
-
-    def apply_action_and_get_reward(self, fig, direc):
+    # fig as id and not one-hot, direc as well
+    def apply_action_and_get_reward(self, fig, direc, state=None, hyperparams=None):
+        in_wall = in_wall_reward
+        goal = goal_reached_reward
+        step = step_reward
+        if hyperparams is not None:
+            if hasattr(hyperparams, "REWARD_IN_WALL"):
+                in_wall = hyperparams.REWARD_IN_WALL
+                goal = hyperparams.REWARD_GOAL_REACHED
+                step = hyperparams.REWARD_STEP
+        if state is None:
+            state = self.game_state
         for x in range(self.grid_size):
             for y in range(self.grid_size):
-                if self.the_state[x][y][4 + fig] == 1:
+                if state[x][y][4 + fig] == 1:
                     # print(fig_dict[fig][0], dir_dict[direc])
-                    new_x, new_y = self.iterate_step(self.the_state, x, y, direc)
+                    new_x, new_y = self.iterate_step(state, x, y, direc)
                     if new_x == x and new_y == y:
-                        return in_wall_reward, False
+                        return in_wall, False
                     else:
-                        self.the_state[x][y][4 + fig] = 0
-                        self.the_state[new_x][new_y][4 + fig] = 1
-                        self.reduced_state[x][y][4 + fig] = 0
-                        self.reduced_state[new_x][new_y][4 + fig] = 1
+                        # self.the_state[x][y][4 + fig] = 0
+                        # self.the_state[new_x][new_y][4 + fig] = 1
+                        state[x][y][4 + fig] = 0
+                        state[new_x][new_y][4 + fig] = 1
                         if self.cur_goal is not None \
-                                and self.the_state[new_x][new_y][4 + self.num_figures] == self.cur_goal \
+                                and np.array_equal(state[new_x][new_y][4 + self.num_figures:4 + 2 * self.num_figures],
+                                                   hlp.as_one_hot(self.cur_goal_color, num_figures)) \
                                 and self.cur_goal_name in fig_dict[fig][1]:
-                            return goal_reached_reward, True
+                            return goal, True
                         else:
-                            return step_reward, False
+                            return step, False
         return in_wall_reward, True
 
     def iterate_step(self, state, x, y, direc, steps=None):
@@ -380,8 +401,8 @@ class Environment:
             fig = get_id_from_name(fig, figures)
         if fig is not None and fig not in self.figs_on_board and fig < self.num_figures:
             if -1 < pos[0] < self.grid_size and -1 < pos[1] < self.grid_size:
-                self.the_state[pos[0]][pos[1]][4:4 + self.num_figures] = hlp.as_one_hot(fig, self.num_figures)
-                self.reduced_state[pos[0]][pos[1]][4:4 + self.num_figures] = hlp.as_one_hot(fig, self.num_figures)
+                # self.visible_state[pos[0]][pos[1]][4:4 + self.num_figures] = hlp.as_one_hot(fig, self.num_figures)
+                self.game_state[pos[0]][pos[1]][4:4 + self.num_figures] = hlp.as_one_hot(fig, self.num_figures)
                 self.figs_on_board.append(fig)
 
     def add_figures(self, pos_figures_tuples):
@@ -393,7 +414,7 @@ class Environment:
             gol = get_id_from_name(gol, goals)
         if gol is not None and gol not in self.goals_on_board and gol < self.num_goals:
             if self.valid_x_y(pos[0], pos[1]):
-                self.the_state[pos[0]][pos[1]][4 + self.num_figures] = gol
+                self.visible_state[pos[0]][pos[1]][4 + self.num_figures] = gol
                 self.goals_on_board.append(gol)
 
     def add_goals(self, pos_goal_tuples):
@@ -432,15 +453,15 @@ class Environment:
         if self.valid_x_y(p1[0], p1[1]):
             p = get_wall_one_hot_pos(d)
             if change is None:
-                change = abs(self.the_state[p1[0]][p1[1]][p] - 1)
-            self.the_state[p1[0]][p1[1]][p] = change
-            self.reduced_state[p1[0]][p1[1]][p] = change
+                change = abs(self.visible_state[p1[0]][p1[1]][p] - 1)
+            self.visible_state[p1[0]][p1[1]][p] = change
+            self.game_state[p1[0]][p1[1]][p] = change
         if self.valid_x_y(p2[0], p2[1]):
             p = get_wall_one_hot_pos(d, invert=True)
             if change is None:
-                change = abs(self.the_state[p2[0]][p2[1]][p] - 1)
-            self.the_state[p2[0]][p2[1]][p] = change
-            self.reduced_state[p2[0]][p2[1]][p] = change
+                change = abs(self.visible_state[p2[0]][p2[1]][p] - 1)
+            self.visible_state[p2[0]][p2[1]][p] = change
+            self.game_state[p2[0]][p2[1]][p] = change
 
     def add_walls(self, between):
         # between is a list of coordinate np.arrays
@@ -449,7 +470,7 @@ class Environment:
 
     def render(self, state=None, flattened=False, reduced=False):
         if state is None:
-            state = self.the_state
+            state = self.visible_state
         else:
             if flattened:
                 state = np.reshape(state, (self.grid_size, self.grid_size, 4 + num_figures + num_figures))
@@ -488,6 +509,15 @@ class Environment:
         return -1 < x < self.grid_size and -1 < y < self.grid_size
 
 
+def get_inverse_action(act):
+    fig = int(act / 4)
+    dir = act % 4
+    out = dir + 2
+    if out >= 4:
+        return fig * 4 + out - 4
+    return fig * 4 + out
+
+
 def print_action(act):
     act = actions[act]
     return "{} {}".format(fig_dict[act.figure][0], dir_dict[act.direction])
@@ -498,7 +528,7 @@ def get_goal_color(gol):
         for col in range(len(fig_dict)):
             if gol in fig_dict[col][1]:
                 return col
-            
+
 
 def get_id_from_name(name, search_list):
     for idx in range(len(search_list)):
@@ -528,4 +558,3 @@ def get_wall_one_hot(d, invert=False):
     if d[1] < 0 and not invert or d[1] > 0 and invert:
         out[3] = 1
     return out
-

@@ -62,6 +62,7 @@ class Status(QWidget):
         # self.ax.plot(self.poly_x, self.poly_y, '*-', color='red')
         self.ax.set_xlabel('epoch')
         self.ax.set_ylabel('avg. steps')
+        self.ax.grid(True)
         self.canvas.draw()
 
     def add_data_point(self, epoch, game_steps, train_steps):

@@ -10,7 +10,7 @@ import game as the_game
 import helper as hlp
 import hyperparameter as hyperparameter
 from gui import gui_train as status_gui
-from net.the_brain import Agent, RandomAgent, stats, debug
+from net.the_brain import Agent, RandomAgent, stats
 
 
 class Handler:
@@ -35,6 +35,7 @@ class Handler:
         self.folder = Path("models/" + self.name)
         self.min_folder = Path(str(self.folder) + "/" + str(self.version) + "/local min")
         self.cur_ts = datetime.datetime.now()
+        self.stopped_early = 0
 
     def set_hps(self, hyperparams):
         self.hp = hyperparams
@@ -70,11 +71,11 @@ class Handler:
             steps, reward = self.the_environment.run(self.agent, board_style, epoch=epoch)
             stats.collect('steps', steps)
             stats.collect('rewards', reward)
-            if epoch % debug.log_epoch == 0:
+            if epoch % self.hp.DEBUG_LOG_EPOCHS == 0:
                 game_steps = []
                 game_rewards = []
-                avg_train_steps = np.mean(stats.steps[-debug.log_epoch:])
-                poller_len = debug.log_epoch if avg_train_steps < self.hp.MINIMUM_CAPTURE_THRESH else 20
+                avg_train_steps = np.mean(stats.steps[-self.hp.DEBUG_LOG_EPOCHS:])
+                poller_len = 50 if avg_train_steps < self.hp.MINIMUM_CAPTURE_THRESH else 20
                 for i in range(poller_len):
                     g_steps, g_rewards = self.the_environment.play_game(self.agent, board_style)
                     game_steps.append(g_steps)
@@ -97,9 +98,24 @@ class Handler:
                     self.gui.add_data_point(epoch, avg_game_steps, avg_train_steps)
                     self.gui.plot()
                 stats.collect('big_steps', avg_game_steps)
+                if len(stats.big_steps) > self.hp.LEARNING_RATE_EARLY_STOP and hasattr(self.hp, "LEARNING_RATE_MAX"):
+                    start = -self.hp.LEARNING_RATE_EARLY_STOP
+                    first = stats.big_steps[start]
+                    early_stop = True
+                    for i in range(start, -1):
+                        if stats.big_steps[i] < first:
+                            early_stop = True
+                            break
+                    if early_stop:
+                        self.stopped_early += 1
+                        new_lr = self.hp.LEARNING_RATE_MAX / (self.stopped_early * 2)
+                        if new_lr < self.hp.LEARNING_RATE_MIN:
+                            new_lr = self.hp.LEARNING_RATE_MIN
+                        self.agent.update_learning_rate(new_lr)
+                        print(f"new learning rate = {new_lr}")
                 stats.steps.clear()
 
-            if epoch % debug.snapshot == 0:
+            if epoch % self.hp.DEBUG_SNAPSHOT == 0:
                 self.save_model(epoch)
 
         if self.save:
@@ -139,17 +155,20 @@ class Handler:
         self.save = True
         self.training = False
 
-    def play_game(self, env_on):
+    def predict_one(self, s, target=False):
+        return self.agent.brain.predictOne(s, target)
+
+    def play_game(self, env_on, max_r):
         r = 0
         min_acts = self.hp.MAX_STEPS
         out_steps, out_total_reward, out_actions = [], [], []
-        while r < 0.4:
+        while r <= max_r:
             steps, total_reward, actions = self.the_environment.play_game(self.agent, env_on=env_on,
                                                                           return_actions=True, ran=r)
             if len(actions) < min_acts:
                 min_acts = len(actions)
                 out_steps, out_total_reward, out_actions = steps, total_reward, actions
-            r += 0.0001
+            r += 0.002
         for a in out_actions:
             print(the_game.print_action(a), end=' ')
         return out_steps, out_total_reward, out_actions

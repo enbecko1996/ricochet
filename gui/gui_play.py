@@ -8,7 +8,7 @@ from PyQt5.QtWidgets import (QWidget, QApplication, QDesktopWidget, QVBoxLayout,
                              QLineEdit, QPushButton, QLabel, QGridLayout, QCheckBox)
 from qtpy.QtGui import QIcon, QPalette
 
-import game as game
+import game as the_game
 from game import Environment
 from gui import gui_hps as gui_hps, game_items_drawer as drawer
 import os
@@ -26,9 +26,9 @@ class Picker(QWidget):
 
     def initUI(self):
         self.btn_size = 50
-        self.resize(2 * self.btn_size, np.maximum(game.num_figures,
-                                                  game.num_goals) * self.btn_size)
-        self.content = np.zeros((game.num_figures, 5), dtype=np.int)
+        self.resize(2 * self.btn_size, np.maximum(the_game.num_figures,
+                                                  the_game.num_goals) * self.btn_size)
+        self.content = np.zeros((the_game.num_figures, 5), dtype=np.int)
         pass
 
     def open(self, pos, edit, env):
@@ -37,15 +37,15 @@ class Picker(QWidget):
         longest = 0
         col_goals = 0
         j = 0
-        for fig in range(game.num_figures):
+        for fig in range(the_game.num_figures):
             self.content[fig][:] = -1
             if fig not in env.figs_on_board:
                 self.content[j][0] = fig
-            goals = game.fig_dict[fig][1]
+            goals = the_game.fig_dict[fig][1]
             cur_len = 0
             for i in range(len(goals)):
                 self.content[j][i + 1] = -1
-                idx = game.get_id_from_name(goals[i], game.goals)
+                idx = the_game.get_id_from_name(goals[i], the_game.goals)
                 if idx not in env.goals_on_board:
                     cur_len += 1
                     self.content[j][cur_len] = idx
@@ -54,7 +54,7 @@ class Picker(QWidget):
             if cur_len > longest:
                 longest = cur_len
             j += 1
-        self.resize(self.btn_size + longest * self.btn_size, game.num_figures * self.btn_size)
+        self.resize(self.btn_size + longest * self.btn_size, the_game.num_figures * self.btn_size)
         self.show()
 
     def mousePressEvent(self, event):
@@ -85,23 +85,23 @@ class Picker(QWidget):
         qp.setBrush(QColor(255, 255, 255))
         qp.drawRect(0, 0, w - 1, h - 1)
         i = 0
-        for fig in range(game.num_figures):
+        for fig in range(the_game.num_figures):
             if fig not in env.figs_on_board:
-                col = game.fig_dict[fig][3]
+                col = the_game.fig_dict[fig][3]
                 qp.setPen(QColor(col[0], col[1], col[2]))
                 qp.setBrush(QColor(col[0], col[1], col[2]))
                 drawer.circle(qp, 0, self.btn_size * i, self.btn_size)
-            goals = game.fig_dict[fig][1]
+            goals = the_game.fig_dict[fig][1]
             cur_len = 0
             i += 1
             for j in range(len(goals)):
-                idx = game.get_id_from_name(goals[j], game.goals)
+                idx = the_game.get_id_from_name(goals[j], the_game.goals)
                 if idx not in env.goals_on_board:
                     cur_len += 1
-                    col = game.goal_dict[idx][2]
+                    col = the_game.goal_dict[idx][2]
                     qp.setPen(QColor(col[0] - 100, col[1] - 100, col[2] - 100))
                     qp.setBrush(QColor(col[0], col[1], col[2]))
-                    game.goal_dict[idx][3](qp, cur_len * self.btn_size, self.btn_size * (i - 1), self.btn_size)
+                    the_game.goal_dict[idx][3](qp, cur_len * self.btn_size, self.btn_size * (i - 1), self.btn_size)
 
 
 class Board(QWidget):
@@ -110,6 +110,7 @@ class Board(QWidget):
         self.env = Environment(8, board_style='small')
         self.clear()
         self.initUI()
+        self.cur_predictions = None
 
     def initUI(self):
         self.setMinimumSize(300, 300)
@@ -139,6 +140,12 @@ class Board(QWidget):
         qp.begin(self)
         self.drawWidget(qp)
         qp.end()
+
+    def set_predictions(self, predict):
+        self.cur_predictions = predict
+
+    def remove_predictions(self):
+        self.cur_predictions = None
 
     def mousePressEvent(self, event):
         mouse = event.localPos()
@@ -184,14 +191,32 @@ class Board(QWidget):
         for x in range(grid):
             for y in range(grid):
                 qp.drawRect(x * per_box, y * per_box, per_box, per_box)
+        if self.cur_predictions is not None:
+            min_pred = np.min(self.cur_predictions)
+            max_pred = np.max(self.cur_predictions)
+            diff = max_pred - min_pred
+            for fig in self.env.figs_on_board:
+                pos = self.env.get_pos_on_board(the_game.fig_dict[fig][0])
+                for a in range(4):
+                    act = fig * 4 + a
+                    act_pred_percent = (self.cur_predictions[act] - min_pred) / diff
+                    print(the_game.fig_dict[fig][0], the_game.print_action(act))
+                    if a == 0:
+                        drawer.prediction_square(qp, pos[0] + 1, pos[1], per_box, act_pred_percent)
+                    elif a == 1:
+                        drawer.prediction_square(qp, pos[0], pos[1] + 1, per_box, act_pred_percent)
+                    elif a == 2:
+                        drawer.prediction_square(qp, pos[0] - 1, pos[1], per_box, act_pred_percent)
+                    elif a == 3:
+                        drawer.prediction_square(qp, pos[0], pos[1] - 1, per_box, act_pred_percent)
         for x in range(grid):
             for y in range(grid):
-                drawer.drawWall(qp, (x, y), self.env.the_state[x][y][:4], per_box)
-                drawer.draw_fig(qp, (x, y), game, self.env.the_state[x][y][4:4 + game.num_figures], per_box)
-                drawer.draw_goal(qp, (x, y), game, self.env.the_state[x][y][4 + game.num_figures], per_box)
+                drawer.drawWall(qp, (x, y), self.env.game_state[x][y][:4], per_box)
+                drawer.draw_fig(qp, (x, y), the_game, self.env.game_state[x][y][4:4 + the_game.num_figures], per_box)
+                drawer.draw_goal(qp, (x, y), the_game, self.env.visible_state[x][y][4 + the_game.num_figures], per_box)
                 if self.env.cur_goal_pos is not None and x == self.env.cur_goal_pos[0] and y == self.env.cur_goal_pos[1]:
-                    print("draw goal")
                     drawer.cur_goal(qp, (x, y), per_box)
+
 
 # --------------------------MAIN-----------------------------------------
 from pathlib import Path
@@ -209,6 +234,9 @@ class RicochetGui(QWidget):
         self.brain_handler = None
         self.graph = None
         self.initUI()
+        self.in_last_game = False
+        self.last_game = None
+        self.cur_step_in_last_game = 0
 
     def initUI(self):
         self.resize(1400, 1000)
@@ -317,9 +345,26 @@ class RicochetGui(QWidget):
         self.play_btn = QPushButton("play", self)
         self.play_btn.clicked.connect(self.play_game)
 
+        self.h_played_box = QHBoxLayout()
+
+        self.backw_btn = QPushButton("<", self)
+        self.backw_btn.clicked.connect(self.backward_step)
+
+        self.cur_step_lab = QLabel("0/0", self)
+
+        self.forw_btn = QPushButton(">", self)
+        self.forw_btn.clicked.connect(self.forward_step)
+
+        self.toggle_played_game(False)
+
+        self.h_played_box.addWidget(self.backw_btn)
+        self.h_played_box.addWidget(self.cur_step_lab)
+        self.h_played_box.addWidget(self.forw_btn)
+
         vbox_3 = QVBoxLayout()
         vbox_3.addWidget(self.enemy)
         vbox_3.addWidget(self.play_btn)
+        vbox_3.addLayout(self.h_played_box)
 
 # -----------LAYOUT---------------------------
 
@@ -350,12 +395,29 @@ class RicochetGui(QWidget):
     @pyqtSlot()
     def play_game(self):
         self.reset_log()
-        if self.board.env.cur_goal_pos is not None and len(self.board.env.figs_on_board) == game.num_figures:
+        if self.board.env.cur_goal_pos is not None and len(self.board.env.figs_on_board) == the_game.num_figures:
             if self.brain_handler is not None:
-                steps, reward, actions = self.brain_handler.play_game(self.board.env)
+                steps, reward, actions = self.brain_handler.play_game(self.board.env, 0)
+                self.in_last_game = True
+                self.last_game = (np.array(self.board.env.game_state), np.array(self.board.env.visible_state),
+                                  steps, reward, actions)
+                self.cur_step_in_last_game = 0
+                self.toggle_played_game(True)
                 print("\n", len(actions), actions)
                 return
         self.error.setText("no goal set, too less figures or brain_handler is None.")
+
+    def toggle_played_game(self, show):
+        if show:
+            self.show_game_steps()
+            self.backw_btn.show()
+            self.cur_step_lab.show()
+            self.forw_btn.show()
+        else:
+            self.backw_btn.hide()
+            self.cur_step_lab.hide()
+            self.forw_btn.hide()
+
 
     @pyqtSlot()
     def save_click(self):
@@ -422,7 +484,6 @@ class RicochetGui(QWidget):
             my_file_2 = Path(folder + "/0/feeder.h5")
             i = -1
             while my_file.is_file() or my_file_2.is_file():
-                print(i)
                 i += 1
                 my_file = Path(folder + "/" + str(i + 1) + "/worker.h5")
                 my_file_2 = Path(folder + "/" + str(i + 1) + "/feeder.h5")
@@ -489,6 +550,34 @@ class RicochetGui(QWidget):
                 return
         self.error.setText("failed to load: " + name + " with vers.: " + vers)
 
+    @pyqtSlot()
+    def forward_step(self):
+        game_actions = self.last_game[4]
+        action_count = len(game_actions)
+        if self.cur_step_in_last_game < action_count:
+            self.board.env.step(game_actions[self.cur_step_in_last_game])
+            self.cur_step_in_last_game += 1
+        self.show_game_steps()
+
+    @pyqtSlot()
+    def backward_step(self):
+        self.board.env.game_state = np.array(self.last_game[0])
+        self.board.env.visible_state = np.array(self.last_game[1])
+        game_actions = self.last_game[4]
+        if self.cur_step_in_last_game > 0:
+            self.cur_step_in_last_game -= 1
+            for i in range(self.cur_step_in_last_game):
+                self.board.env.step(game_actions[i])
+        self.show_game_steps()
+
+    def show_game_steps(self):
+        self.board.set_predictions(self.brain_handler.predict_one(self.board.env.get_flattened_reduced_state()))
+        self.update_cur_step_lab()
+        self.board.update()
+
+    def update_cur_step_lab(self):
+        self.cur_step_lab.setText(f"{self.cur_step_in_last_game}/{len(self.last_game[4])}")
+
     def load_agent(self, name, vers, worker_file, feeder_file, cur_hps=None):
         self.brain_handler = net_handler.Handler(name, vers, conv=self.conv.isChecked(), worker=worker_file,
                                                  feeder=feeder_file, hyperparams=cur_hps)
@@ -499,7 +588,7 @@ class RicochetGui(QWidget):
         self.success.setText("successfully loaded {}".format(worker_file))
 
     def closeEvent(self, event):
-        event.accpt()
+        event.accept()
 
     def center(self):
         qr = self.frameGeometry()

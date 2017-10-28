@@ -4,6 +4,16 @@ import numpy as np
 import helper as hlp
 
 
+def prediction_square(qp, x, y, per_box, percent):
+    red = (1 - (2 * percent - 1)) * 255 if percent > 0.5 else 255
+    green = 2 * percent * 255 if percent < 0.5 else 255
+    offset = 10
+    h_off = offset / 2
+    qp.setPen(QColor(red, green, 0, 170))
+    qp.setBrush(QColor(red, green, 0, 170))
+    qp.drawRect(x * per_box + h_off, y * per_box + h_off, per_box - offset, per_box - offset)
+
+
 def circle(qp, x, y, size, offset=6):
     h_off = offset / 2
     half = size / 2
@@ -64,11 +74,8 @@ def draw_goal(qp, pos, game, idx, per_box):
 
 def cur_goal(qp, pos, per_box):
     pen = QPen(QColor(255, 255, 80))
-    print("hh1")
     pen.setWidth(8)
     qp.setPen(pen)
     qp.setBrush(QColor(0, 0, 0, 0))
-    print("hh2")
     qp.drawRect(pos[0] * per_box + 3, pos[1] * per_box + 3, per_box - 3, per_box - 3)
-    print("hh3")
 

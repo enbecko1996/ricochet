@@ -45,20 +45,9 @@ class stats_collector():
         if self.diction[name][0]:
             plt.plot(self.diction[name][1])
             plt.show()
-#
-
-class debugger:
-    render = False
-    log_epoch = 30
-    snapshot = 300
-
-    def reset(self):
-        pass
 
 
 stats = stats_collector()
-debug = debugger()
-
 
 # ---------------huber-------------------------------------
 HUBER_LOSS_DELTA = 1.0
@@ -117,8 +106,8 @@ class Brain:
             # model.add(Dense(units=200, activation='relu'))
             model.add(Dense(units=self.actionCnt, activation='linear'))
 
-        print(f"learning rate = {self.handler.hp.LEARNING_RATE}")
-        opt = RMSprop(lr=self.handler.hp.LEARNING_RATE)
+        print(f"learning rate = {self.handler.hp.get_attr('LEARNING_RATE')}")
+        opt = RMSprop(lr=self.handler.hp.get_attr('LEARNING_RATE'))
         model.compile(loss=huber_loss, optimizer=opt)
 
         return model
@@ -174,11 +163,24 @@ class Agent:
         print("hey6")
         self.memory = Memory(handler.hp.MEMORY_CAPACITY)
 
-    def act(self, s):
-        if random.random() < self.epsilon:
+    def act(self, s, steps, epsilon=None):
+        if epsilon is None:
+            epsilon = self.epsilon
+        prediction = self.brain.predictOne(s)
+        if random.random() < epsilon:
             return random.randrange(0, self.actionCnt)
         else:
-            return numpy.argmax(self.brain.predictOne(s))
+            """if epsilon > 0:
+                rand = random.random()
+                rand = 1 - rand**steps
+                for i in range(8):
+                    i = 7 - i
+                    if rand <= epsilon**i:
+                        for j in range(i):
+                            prediction[numpy.argmax(prediction)] = -99999
+                        return numpy.argmax(prediction)
+            else:"""
+            return numpy.argmax(prediction)
 
     def observe(self, sample, epoch):  # in (s, a, r, s_) format
         self.memory.add(sample)
@@ -252,7 +254,7 @@ class RandomAgent:
         self.memory = Memory(handler.hp.MEMORY_CAPACITY)
         self.actionCnt = action_count
 
-    def act(self, s):
+    def act(self, s, steps):
         return random.randrange(0, self.actionCnt)
 
     def observe(self, sample, epoch):  # in (s, a, r, s_) format

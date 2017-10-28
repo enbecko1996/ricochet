@@ -76,8 +76,10 @@ def to_wrkdir():
     import os
     try:
         print(os.getcwd())
-        os.chdir("ricochet")
+        os.chdir("/home/nic/Dokumente/ricochet")
+        print(os.getcwd())
     except FileNotFoundError:
+        print("error")
         pass
 
 """for i in range(8):

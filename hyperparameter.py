@@ -31,7 +31,9 @@ class AgentsHyperparameters:
         # neural_net
         self.MAX_STEPS = 300
         self.EPOCHS = 75000
-        self.LEARNING_RATE = 0.01
+        self.LEARNING_RATE_EARLY_STOP = 50
+        self.LEARNING_RATE_MIN = 0.01
+        self.LEARNING_RATE_MAX = 0.01
 
         self.MEMORY_CAPACITY = 100000
         self.REPLAY = 2
@@ -48,3 +50,17 @@ class AgentsHyperparameters:
         self.UPDATE_TARGET_FREQUENCY = 1000
 
         self.MINIMUM_CAPTURE_THRESH = 300
+
+        self.REWARD_IN_WALL = -2.0
+        self.REWARD_GOAL_REACHED = 80.0
+        self.REWARD_STEP = -1.0
+
+        self.DEBUG_LOG_EPOCHS = 300
+        self.DEBUG_SNAPSHOT = 1200
+
+    def get_attr(self, name):
+        if name == 'LEARNING_RATE':
+            if hasattr(self, 'LEARNING_RATE'):
+                return self.LEARNING_RATE
+            elif hasattr(self, 'LEARNING_RATE_MAX'):
+                return self.LEARNING_RATE_MAX
