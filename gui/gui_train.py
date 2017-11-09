@@ -5,7 +5,8 @@ import matplotlib.pyplot as plt
 from PyQt5.QtCore import Qt, pyqtSlot
 from PyQt5.QtWidgets import (QWidget, QApplication, QDesktopWidget, QVBoxLayout, QHBoxLayout,
                              QPushButton, QLabel)
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas, \
+    NavigationToolbar2QT as NavigationToolbar
 from qtpy.QtGui import QIcon
 import numpy as np
 
@@ -37,6 +38,9 @@ class Status(QWidget):
 
         self.figure = matplotlib.figure.Figure()
         self.canvas = FigureCanvas(self.figure)
+
+        self.toolbar = NavigationToolbar(self.canvas, self)
+
         self.ax = self.figure.add_subplot(111)
 
         v_main = QVBoxLayout()
@@ -50,6 +54,7 @@ class Status(QWidget):
 
         v_main.addLayout(hbox)
 
+        v_main.addWidget(self.toolbar)
         v_main.addWidget(self.canvas)
         self.setLayout(v_main)
         self.plot()

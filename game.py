@@ -6,7 +6,9 @@ import helper as hlp
 import hyperparameter as hp
 from gui import game_items_drawer as g
 
-grid_size = 4
+grid_size = 8
+standard_board_style = 'small'
+
 figures = ['red', 'green', 'blue', 'yellow', 'grey']
 # num_figures = len(figures)
 num_figures = 3
@@ -68,7 +70,7 @@ action_size = len(actions)
 
 
 class Environment:
-    def __init__(self, g_size, board_style='none'):
+    def __init__(self, g_size=grid_size, board_style=standard_board_style):
         self.visible_state = np.zeros((g_size, g_size, 4 + num_figures + 1), dtype=np.int)
         self.game_state = np.zeros((g_size, g_size, 4 + num_figures + num_figures), dtype=np.int)
         self.grid_size = g_size
@@ -86,7 +88,7 @@ class Environment:
         self.goals_on_board = []
         self.apply_board_style(board_style)
 
-    def reset(self, flattened=True, figure_style='same', board_style='none', goal_style='random'):
+    def reset(self, flattened=True, figure_style='test_case', board_style=standard_board_style, goal_style='random'):
         self.visible_state = np.zeros((self.grid_size, self.grid_size, 4 + num_figures + 1), dtype=np.int)
         self.game_state = np.zeros((self.grid_size, self.grid_size, 4 + num_figures + num_figures), dtype=np.int)
         self.figs_on_board.clear()
@@ -97,6 +99,8 @@ class Environment:
             if goal_style == 'random':
                 if len(self.goals_on_board) > 0:
                     self.set_current_goal(goals[self.goals_on_board[rand.randrange(0, len(self.goals_on_board))]])
+            elif goal_style == 'test_case':
+                self.set_current_goal('blue_triangle')
         else:
             if len(self.goals_on_board) > 0:
                 self.set_current_goal('green_square')
@@ -231,10 +235,10 @@ class Environment:
     def set_figures(self, style):
         if style == 'none':
             pass
-        if style == 'same':
-            self.add_single_figure([3, 3], 'red')
+        if style == 'test_case':
+            self.add_single_figure([7, 0], 'red')
             self.add_single_figure([2, 3], 'green')
-            self.add_single_figure([1, 3], 'grey')
+            self.add_single_figure([5, 5], 'blue')
         if style == 'random':
             poss = []
             for i in range(num_figures):
@@ -260,7 +264,7 @@ class Environment:
         elif isinstance(gol, int):
             self.cur_goal_name = goal_dict[gol][0]
             self.cur_goal = gol
-        self.cur_goal_pos = self.get_pos_on_board(self.cur_goal_name, state=self.visible_state,)
+        self.cur_goal_pos = self.get_pos_on_board(self.cur_goal_name, state=self.visible_state)
         self.cur_goal_color = get_goal_color(self.cur_goal_name)
         if self.cur_goal_name != 'all':
             self.game_state[self.cur_goal_pos[0]][self.cur_goal_pos[1]][4 + num_figures:4 + 2 * num_figures] = \

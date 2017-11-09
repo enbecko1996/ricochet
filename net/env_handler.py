@@ -7,6 +7,7 @@ import game as the_game
 import numpy as np
 from queue import Queue
 import helper as hlp
+import time
 
 
 class Environment:
@@ -32,7 +33,8 @@ class Environment:
         return self.my_env.dims
 
     def run(self, current_agent, board_style, epoch=0):
-        s = self.my_env.reset(flattened=not self.conv, figure_style='random', board_style=board_style)
+        s = self.my_env.reset(flattened=not self.conv, figure_style='random',
+                              board_style=board_style, goal_style='random')
         total_reward = 0
 
         steps = 0
@@ -64,7 +66,8 @@ class Environment:
             self.my_env.set_state_from_other_env(env_on)
             s = self.my_env.get_flattened_reduced_state() if not self.conv else self.my_env.get_reduced_state()
         else:
-            s = self.my_env.reset(flattened=not self.conv, figure_style='random', board_style=board_style)
+            s = self.my_env.reset(flattened=not self.conv, figure_style='random',
+                                  board_style=board_style, goal_style='random')
         total_reward = 0
         steps = 0
         actions = []
@@ -140,6 +143,10 @@ class Environment:
             return None
 
 
+def current_time_milli():
+    return int(round(time.time() * 1000))
+
+
 def do_stuff():
-    the_environment = Environment(False, the_game.Environment(8))
+    the_environment = Environment(False, the_game.Environment(the))
     print(the_environment.brute_force(board_style='small'))

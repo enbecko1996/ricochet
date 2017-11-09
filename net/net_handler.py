@@ -20,7 +20,7 @@ class Handler:
         self.hp = hyperparams
         if hyperparams is None:
             self.hp = hyperparameter.AgentsHyperparameters()
-        self.the_environment = Environment(conv, the_game.Environment(8))
+        self.the_environment = Environment(conv, the_game.Environment(the_game.grid_size))
         self.conv = conv
         self.training = False
         self.finished = False
@@ -36,10 +36,11 @@ class Handler:
         self.min_folder = Path(str(self.folder) + "/" + str(self.version) + "/local min")
         self.cur_ts = datetime.datetime.now()
         self.stopped_early = 0
+        self.wait_for_next_early = 0
 
     def set_hps(self, hyperparams):
         self.hp = hyperparams
-        self.agent.update_learning_rate(self.hp.LEARNING_RATE)
+        self.agent.update_learning_rate(self.hp.get_attr("LEARNING_RATE"))
 
     def initialize(self):
         self.agent = Agent(self, conv=self.conv, action_count=self.the_environment.get_action_cnt(),
@@ -71,11 +72,11 @@ class Handler:
             steps, reward = self.the_environment.run(self.agent, board_style, epoch=epoch)
             stats.collect('steps', steps)
             stats.collect('rewards', reward)
-            if epoch % self.hp.DEBUG_LOG_EPOCHS == 0:
+            if epoch % self.hp.get_attr('DEBUG_LOG_EPOCHS') == 0:
                 game_steps = []
                 game_rewards = []
-                avg_train_steps = np.mean(stats.steps[-self.hp.DEBUG_LOG_EPOCHS:])
-                poller_len = 50 if avg_train_steps < self.hp.MINIMUM_CAPTURE_THRESH else 20
+                avg_train_steps = np.mean(stats.steps[-self.hp.get_attr('DEBUG_LOG_EPOCHS'):])
+                poller_len = self.hp.get_attr('DEBUG_LOG_EPOCHS')
                 for i in range(poller_len):
                     g_steps, g_rewards = self.the_environment.play_game(self.agent, board_style)
                     game_steps.append(g_steps)
@@ -98,24 +99,29 @@ class Handler:
                     self.gui.add_data_point(epoch, avg_game_steps, avg_train_steps)
                     self.gui.plot()
                 stats.collect('big_steps', avg_game_steps)
-                if len(stats.big_steps) > self.hp.LEARNING_RATE_EARLY_STOP and hasattr(self.hp, "LEARNING_RATE_MAX"):
-                    start = -self.hp.LEARNING_RATE_EARLY_STOP
-                    first = stats.big_steps[start]
-                    early_stop = True
-                    for i in range(start, -1):
-                        if stats.big_steps[i] < first:
-                            early_stop = True
-                            break
-                    if early_stop:
-                        self.stopped_early += 1
-                        new_lr = self.hp.LEARNING_RATE_MAX / (self.stopped_early * 2)
-                        if new_lr < self.hp.LEARNING_RATE_MIN:
-                            new_lr = self.hp.LEARNING_RATE_MIN
-                        self.agent.update_learning_rate(new_lr)
-                        print(f"new learning rate = {new_lr}")
+                if hasattr(self.hp, "LEARNING_RATE_MAX") and len(stats.big_steps) > self.hp.LEARNING_RATE_EARLY_STOP:
+                    if self.wait_for_next_early < self.hp.LEARNING_RATE_EARLY_STOP:
+                        self.wait_for_next_early += 1
+                    else:
+                        start = -self.hp.LEARNING_RATE_EARLY_STOP
+                        first = stats.big_steps[start]
+                        early_stop = True
+                        for i in range(start, -1):
+                            print(stats.big_steps[i], first)
+                            if stats.big_steps[i] < first:
+                                early_stop = False
+                                break
+                        if early_stop:
+                            self.stopped_early += 1
+                            new_lr = self.hp.LEARNING_RATE_MAX / (self.stopped_early * 2)
+                            if new_lr < self.hp.LEARNING_RATE_MIN:
+                                new_lr = self.hp.LEARNING_RATE_MIN
+                            self.agent.update_learning_rate(new_lr)
+                            print(f"new learning rate = {new_lr}")
+                            self.wait_for_next_early = 0
                 stats.steps.clear()
 
-            if epoch % self.hp.DEBUG_SNAPSHOT == 0:
+            if epoch % self.hp.get_attr('DEBUG_SNAPSHOT') == 0:
                 self.save_model(epoch)
 
         if self.save:

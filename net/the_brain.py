@@ -76,6 +76,7 @@ class Brain:
     def __init__(self, handler, conv, stateCnt=0, actionCnt=0, grid_size=0, dims=0, worker=None, feeder=None):
         self.handler = handler
         self.conv = conv
+        print(stateCnt)
         self.stateCnt = stateCnt
         self.actionCnt = actionCnt
         self.grid_size = grid_size
@@ -100,8 +101,9 @@ class Brain:
             model.add(Dense(units=80, activation='relu'))
             model.add(Dense(units=self.actionCnt, activation='linear'))
         else:
-            num = int(self.stateCnt * (2./3) + self.actionCnt)
-            model.add(Dense(units=num, activation='relu', input_dim=self.stateCnt))
+            num = int(self.stateCnt + self.actionCnt)
+            model.add(Dense(units=int(num / 3), activation='tanh', input_dim=self.stateCnt))
+            model.add(Dense(units=num, activation='tanh', input_dim=self.stateCnt))
             # model.add(Dropout(0.1))
             # model.add(Dense(units=200, activation='relu'))
             model.add(Dense(units=self.actionCnt, activation='linear'))

@@ -107,7 +107,7 @@ class Picker(QWidget):
 class Board(QWidget):
     def __init__(self, parent=None):
         QWidget.__init__(self, parent)
-        self.env = Environment(8, board_style='small')
+        self.env = Environment(the_game.grid_size, board_style='small')
         self.clear()
         self.initUI()
         self.cur_predictions = None
@@ -121,8 +121,7 @@ class Board(QWidget):
         self.pick.hide()
 
     def clear(self):
-        self.env.add_surrounding()
-        # self.env.reset(figure_style='none', board_style=same_board_style)
+        self.env.reset(figure_style='none', board_style='small')
         """self.env.set_quadrant(low, "quadrants/pre_0_1.npy")
         self.env.set_quadrant(0, "quadrants/pre_7_1.npy")
         self.env.set_quadrant(3, "quadrants/pre_3_0.npy")
@@ -397,7 +396,7 @@ class RicochetGui(QWidget):
         self.reset_log()
         if self.board.env.cur_goal_pos is not None and len(self.board.env.figs_on_board) == the_game.num_figures:
             if self.brain_handler is not None:
-                steps, reward, actions = self.brain_handler.play_game(self.board.env, 0)
+                steps, reward, actions = self.brain_handler.play_game(self.board.env, 0.6)
                 self.in_last_game = True
                 self.last_game = (np.array(self.board.env.game_state), np.array(self.board.env.visible_state),
                                   steps, reward, actions)

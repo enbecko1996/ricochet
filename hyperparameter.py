@@ -64,3 +64,11 @@ class AgentsHyperparameters:
                 return self.LEARNING_RATE
             elif hasattr(self, 'LEARNING_RATE_MAX'):
                 return self.LEARNING_RATE_MAX
+        elif name == 'DEBUG_LOG_EPOCHS':
+            if not hasattr(self, 'DEBUG_LOG_EPOCHS'):
+                self.DEBUG_LOG_EPOCHS = 600
+            return self.DEBUG_LOG_EPOCHS
+        elif name == 'DEBUG_SNAPSHOT':
+            if not hasattr(self, 'DEBUG_SNAPSHOT'):
+                self.DEBUG_SNAPSHOT = 3000
+            return self.DEBUG_SNAPSHOT
