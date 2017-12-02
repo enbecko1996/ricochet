@@ -101,9 +101,9 @@ class Brain:
             model.add(Dense(units=80, activation='relu'))
             model.add(Dense(units=self.actionCnt, activation='linear'))
         else:
-            num = int(self.stateCnt + self.actionCnt)
-            model.add(Dense(units=int(num / 3), activation='tanh', input_dim=self.stateCnt))
-            model.add(Dense(units=num, activation='tanh', input_dim=self.stateCnt))
+            num = 180 # y<ys1ysdwcy<sa<dwyx<as< int(self.stateCnt * (1.5 / 3) + self.actionCnt)
+            model.add(Dense(units=int(num), activation='tanh', input_dim=self.stateCnt))
+            # model.add(Dense(units=num, activation='tanh', input_dim=self.stateCnt))
             # model.add(Dropout(0.1))
             # model.add(Dense(units=200, activation='relu'))
             model.add(Dense(units=self.actionCnt, activation='linear'))

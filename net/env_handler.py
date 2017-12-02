@@ -8,6 +8,7 @@ import numpy as np
 from queue import Queue
 import helper as hlp
 import time
+import mcts
 
 
 class Environment:
@@ -33,7 +34,7 @@ class Environment:
         return self.my_env.dims
 
     def run(self, current_agent, board_style, epoch=0):
-        s = self.my_env.reset(flattened=not self.conv, figure_style='random',
+        s = self.my_env.reset(flattened=not self.conv, figure_style='as_is',
                               board_style=board_style, goal_style='random')
         total_reward = 0
 
@@ -61,7 +62,27 @@ class Environment:
             current_agent.replay()
         return steps, total_reward
 
-    def play_game(self, current_agent, board_style='none', env_on=None, return_actions=False, ran=0):
+    def play_game(self, play_style, current_agent, board_style='none', env_on=None, return_actions=False, ran=0):
+        if play_style == 'mcts':
+            return self.play_game_mcts(current_agent, board_style, env_on, return_actions, ran)
+        else:
+            return self.play_game_old(current_agent, board_style, env_on, return_actions, ran)
+
+    def play_game_mcts(self, current_agent, board_style='none', env_on=None, return_actions=False, ran=0):
+        if env_on is not None:
+            self.my_env.set_state_from_other_env(env_on)
+            s = self.my_env.get_reduced_state()
+        else:
+            s = self.my_env.reset(flattened=False, figure_style='as_is',
+                                  board_style=board_style, goal_style='random')
+        mcts_obj = mcts.MCTS()
+        total_reward, actions = mcts_obj.do_mcts(s, current_agent)
+        if return_actions:
+            return len(actions), total_reward, actions
+        else:
+            return len(actions), total_reward
+
+    def play_game_old(self, current_agent, board_style='none', env_on=None, return_actions=False, ran=0):
         if env_on is not None:
             self.my_env.set_state_from_other_env(env_on)
             s = self.my_env.get_flattened_reduced_state() if not self.conv else self.my_env.get_reduced_state()
@@ -148,5 +169,5 @@ def current_time_milli():
 
 
 def do_stuff():
-    the_environment = Environment(False, the_game.Environment(the))
+    the_environment = Environment(False, the_game.Environment(the_game.grid_size))
     print(the_environment.brute_force(board_style='small'))

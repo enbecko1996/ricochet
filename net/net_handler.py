@@ -78,7 +78,7 @@ class Handler:
                 avg_train_steps = np.mean(stats.steps[-self.hp.get_attr('DEBUG_LOG_EPOCHS'):])
                 poller_len = self.hp.get_attr('DEBUG_LOG_EPOCHS')
                 for i in range(poller_len):
-                    g_steps, g_rewards = self.the_environment.play_game(self.agent, board_style)
+                    g_steps, g_rewards = self.the_environment.play_game('old', self.agent, board_style=board_style)
                     game_steps.append(g_steps)
                     game_rewards.append(g_rewards)
                 avg_game_steps = np.mean(game_steps)
@@ -169,7 +169,7 @@ class Handler:
         min_acts = self.hp.MAX_STEPS
         out_steps, out_total_reward, out_actions = [], [], []
         while r <= max_r:
-            steps, total_reward, actions = self.the_environment.play_game(self.agent, env_on=env_on,
+            steps, total_reward, actions = self.the_environment.play_game('mcts', self.agent, env_on=env_on,
                                                                           return_actions=True, ran=r)
             if len(actions) < min_acts:
                 min_acts = len(actions)

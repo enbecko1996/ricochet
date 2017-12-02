@@ -6,12 +6,14 @@ import helper as hlp
 import hyperparameter as hp
 from gui import game_items_drawer as g
 
-grid_size = 8
-standard_board_style = 'small'
+same_board_style = [[0, 0], [1, 1], [2, 0], [3, 1]]
+
+grid_size = 12
+standard_board_style = 'medium'
 
 figures = ['red', 'green', 'blue', 'yellow', 'grey']
-# num_figures = len(figures)
-num_figures = 3
+num_figures = len(figures)
+num_figures = 4
 goals = ['placeholder']
 red_goals = ['red_hexagon', 'red_square', 'red_triangle', 'red_circle']
 green_goals = ['green_hexagon', 'green_square', 'green_triangle', 'green_circle']
@@ -53,6 +55,7 @@ fig_dict = {0: ('red', red_goals, 'R', red), 1: ('green', green_goals, 'G', gree
 
 all_quadrants = np.load("quadrants/pre_all.npy")
 smallrgb = np.load("small/r-g-b.npy")
+mediumrgby = np.load("small/medium.npy")
 
 in_wall_reward = -2.0
 step_reward = -1.0
@@ -89,11 +92,11 @@ class Environment:
         self.apply_board_style(board_style)
 
     def reset(self, flattened=True, figure_style='test_case', board_style=standard_board_style, goal_style='random'):
-        self.visible_state = np.zeros((self.grid_size, self.grid_size, 4 + num_figures + 1), dtype=np.int)
-        self.game_state = np.zeros((self.grid_size, self.grid_size, 4 + num_figures + num_figures), dtype=np.int)
-        self.figs_on_board.clear()
-        self.goals_on_board.clear()
-        self.apply_board_style(board_style)
+        # self.visible_state = np.zeros((self.grid_size, self.grid_size, 4 + num_figures + 1), dtype=np.int)
+        # self.game_state = np.zeros((self.grid_size, self.grid_size, 4 + num_figures + num_figures), dtype=np.int)
+        # self.figs_on_board.clear()
+        # self.goals_on_board.clear()
+        # self.apply_board_style(board_style)
         self.set_figures(figure_style)
         if isinstance(goal_style, str):
             if goal_style == 'random':
@@ -122,6 +125,10 @@ class Environment:
                 self.set_random_board()
             if board_style == 'small':
                 self.set_full(smallrgb)
+            elif board_style == 'border':
+                self.add_surrounding()
+            elif board_style == 'medium':
+                self.set_full(mediumrgby)
         elif board_style is not None:
             for i in range(4):
                 self.set_quadrant(i + 1, all_quadrants[board_style[i][0]][board_style[i][1]])
@@ -233,19 +240,35 @@ class Environment:
                             self.goals_on_board.append(self.visible_state[x][y][4 + num_figures])
 
     def set_figures(self, style):
-        if style == 'none':
+        if style == 'as_is':
+            if len(self.figs_on_board) > 0:
+                if rand.random() <= 0.0625:
+                    self.set_figures('random')
+            else:
+                self.set_figures('random')
+        elif style == 'none':
             pass
-        if style == 'test_case':
+        elif style == 'test_case':
+            self.remove_all_figures()
             self.add_single_figure([7, 0], 'red')
             self.add_single_figure([2, 3], 'green')
             self.add_single_figure([5, 5], 'blue')
-        if style == 'random':
+        elif style == 'random':
+            self.remove_all_figures()
             poss = []
             for i in range(num_figures):
                 x, y = rand.randrange(0, self.grid_size), rand.randrange(0, self.grid_size)
                 if (x, y) not in poss:
                     poss.append((x, y))
                     self.add_single_figure([x, y], i)
+
+    def remove_all_figures(self, state=None):
+        if state is None:
+            state = self.game_state
+        for x in range(self.grid_size):
+            for y in range(self.grid_size):
+                state[x][y][4:4 + self.num_figures] = 0
+        self.figs_on_board.clear()
 
     def get_current_goal_pos(self):
         for x in range(self.grid_size):
@@ -369,10 +392,8 @@ class Environment:
                         # self.the_state[new_x][new_y][4 + fig] = 1
                         state[x][y][4 + fig] = 0
                         state[new_x][new_y][4 + fig] = 1
-                        if self.cur_goal is not None \
-                                and np.array_equal(state[new_x][new_y][4 + self.num_figures:4 + 2 * self.num_figures],
-                                                   hlp.as_one_hot(self.cur_goal_color, num_figures)) \
-                                and self.cur_goal_name in fig_dict[fig][1]:
+                        if np.array_equal(state[new_x][new_y][4 + self.num_figures:4 + 2 * self.num_figures],
+                                          state[new_x][new_y][4:4 + self.num_figures]):
                             return goal, True
                         else:
                             return step, False
@@ -523,8 +544,11 @@ def get_inverse_action(act):
 
 
 def print_action(act):
-    act = actions[act]
-    return "{} {}".format(fig_dict[act.figure][0], dir_dict[act.direction])
+    if act is not None:
+        act = actions[act]
+        return "{} {}".format(fig_dict[act.figure][0], dir_dict[act.direction])
+    else:
+        return str(None)
 
 
 def get_goal_color(gol):
